@@ -32,7 +32,8 @@ class BaseEnv(gym.Env):
         ## Properties already instantiated from SensorEnv/CameraEnv
         #   @self.robot
         self.gui = config["mode"] == "gui"
-        self.model_id = config["model_id"]
+        if "model_id" in config:
+            self.model_id = config["model_id"]
         self.timestep = config["speed"]["timestep"]
         self.frame_skip = config["speed"]["frameskip"]
         self.resolution = config["resolution"]

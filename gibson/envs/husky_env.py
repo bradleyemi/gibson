@@ -141,7 +141,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
         
         alive = len(self.robot.parts['top_bumper_link'].contact_list()) == 0
 
-        done = not alive or self.nframe > 250 or height < 0
+        done = not alive or self.nframe > self.config["episode_length"] or height < 0
         #if done:
         #    print("Episode reset")
         return done

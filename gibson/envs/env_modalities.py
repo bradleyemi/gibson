@@ -330,7 +330,8 @@ class CameraRobotEnv(BaseRobotEnv):
         self._require_normal = 'normal' in self.config["output"]
 
         #if self._require_camera_input:
-        self.model_path = get_model_path(self.model_id)
+        if hasattr(self, "model_id"):
+            self.model_path = get_model_path(self.model_id)
 
         self.save_frame  = 0
         self.fps = 0
@@ -338,7 +339,8 @@ class CameraRobotEnv(BaseRobotEnv):
 
     def robot_introduce(self, robot):
         BaseRobotEnv.robot_introduce(self, robot)
-        self.setup_rendering_camera()
+        if hasattr(self, "model_path"):
+            self.setup_rendering_camera()
 
     def scene_introduce(self):
         BaseRobotEnv.scene_introduce(self)
