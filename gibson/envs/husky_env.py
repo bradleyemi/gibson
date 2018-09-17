@@ -41,6 +41,9 @@ class HuskyNavigateEnv(CameraRobotEnv):
         self.scene_introduce()
         self.total_reward = 0
         self.total_frame = 0
+        if self.config["ideal_position_control"]:
+            for _ in range(100):
+                self.scene.global_step()
 
     def add_text(self, img):
         font = cv2.FONT_HERSHEY_SIMPLEX
@@ -91,9 +94,14 @@ class HuskyNavigateEnv(CameraRobotEnv):
 
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
         close_to_target = 0
-
-        if self.robot.dist_to_target() < 2:
-            close_to_target = 0.5
+        
+        #print(self.robot.dist_to_target())
+        if self.robot.dist_to_target() < 3 and self.nframe == self.config["episode_length"]:
+            close_to_target = 50.
+        if self.robot.dist_to_target() < 2 and self.nframe == self.config["episode_length"]:
+            close_to_target = 75.
+        if self.robot.dist_to_target() < 1:
+            close_to_target = 100.
 
         angle_cost = self.robot.angle_cost()
 
@@ -104,7 +112,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
         debugmode = 0
         if debugmode:
             print("angle cost", angle_cost)
-
+        alive = -0.25
         debugmode = 0
         if (debugmode):
             print("Wall contact points", len(wall_contact))
@@ -120,18 +128,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
             #print("feet_collision_cost")
             #print(feet_collision_cost)
 
-        rewards = [
-            #alive,
-            progress,
-            #wall_collision_cost,
-            close_to_target,
-            steering_cost,
-            angle_cost,
-            obstacle_penalty
-            #electricity_cost,
-            #joints_at_limit_cost,
-            #feet_collision_cost
-        ]
+        rewards = [alive, close_to_target]
         return rewards
 
     def _termination(self, debugmode=False):
@@ -141,7 +138,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
         
         alive = len(self.robot.parts['top_bumper_link'].contact_list()) == 0
 
-        done = not alive or self.nframe > self.config["episode_length"] or height < 0
+        done = self.nframe >= self.config["episode_length"] or self.robot.dist_to_target() < 1
         #if done:
         #    print("Episode reset")
         return done

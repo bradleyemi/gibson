@@ -88,11 +88,11 @@ class WalkerBase(BaseRobot):
         new_pos = np.array(delta) + self.get_position()
         self.robot_body.reset_position(new_pos)
 
-    def move_forward(self, forward=0.05):
+    def move_forward(self, forward=0.035):
         x, y, z, w = self.robot_body.get_orientation()
         self.move_by(quat2mat([w, x, y, z]).dot(np.array([forward, 0, 0])))
         
-    def move_backward(self, backward=0.05):
+    def move_backward(self, backward=0.035):
         x, y, z, w = self.robot_body.get_orientation()
         self.move_by(quat2mat([w, x, y, z]).dot(np.array([-backward, 0, 0])))
 
@@ -453,15 +453,21 @@ class Husky(WalkerBase):
                             resolution=config["resolution"], 
                             env = env)
         self.is_discrete = config["is_discrete"]
+        self.ideal_position_control = config["ideal_position_control"]
+        if self.ideal_position_control:
+            assert(self.is_discrete)
 
         if self.is_discrete:
             self.action_space = gym.spaces.Discrete(5)        
             self.torque = 0.03
-            self.action_list = [[self.torque, self.torque, self.torque, self.torque],
-                                [-self.torque, -self.torque, -self.torque, -self.torque],
-                                [self.torque, -self.torque, self.torque, -self.torque],
-                                [-self.torque, self.torque, -self.torque, self.torque],
-                                [0, 0, 0, 0]]
+            if self.ideal_position_control:
+                self.action_list = [self.move_forward, self.move_backward, self.turn_right, self.turn_left, lambda: None]
+            else:
+                self.action_list = [[self.torque, self.torque, self.torque, self.torque],
+                                    [-self.torque, -self.torque, -self.torque, -self.torque],
+                                    [self.torque, -self.torque, self.torque, -self.torque],
+                                    [-self.torque, self.torque, -self.torque, self.torque],
+                                    [0, 0, 0, 0]]
 
             self.setup_keys_to_action()
         else:
@@ -469,11 +475,15 @@ class Husky(WalkerBase):
             self.action_space = gym.spaces.Box(-action_high, action_high)
         
     def apply_action(self, action):
-        if self.is_discrete:
-            realaction = self.action_list[action]
+        if self.ideal_position_control:
+            action_function = self.action_list[action]
+            action_function()
         else:
-            realaction = action
-        WalkerBase.apply_action(self, realaction)
+            if self.is_discrete:
+                realaction = self.action_list[action]
+            else:
+                realaction = action
+            WalkerBase.apply_action(self, realaction)
 
     def steering_cost(self, action):
         if not self.is_discrete:
