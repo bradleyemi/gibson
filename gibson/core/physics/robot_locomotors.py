@@ -88,20 +88,20 @@ class WalkerBase(BaseRobot):
         new_pos = np.array(delta) + self.get_position()
         self.robot_body.reset_position(new_pos)
 
-    def move_forward(self, forward=0.035):
+    def move_forward(self, forward=0.07):
         x, y, z, w = self.robot_body.get_orientation()
         self.move_by(quat2mat([w, x, y, z]).dot(np.array([forward, 0, 0])))
         
-    def move_backward(self, backward=0.035):
+    def move_backward(self, backward=0.07):
         x, y, z, w = self.robot_body.get_orientation()
         self.move_by(quat2mat([w, x, y, z]).dot(np.array([-backward, 0, 0])))
 
-    def turn_left(self, delta=0.03):
+    def turn_left(self, delta=0.06):
         orn = self.robot_body.get_orientation()
         new_orn = qmult((euler2quat(-delta, 0, 0)), orn)
         self.robot_body.set_orientation(new_orn)
 
-    def turn_right(self, delta=0.03):
+    def turn_right(self, delta=0.06):
         orn = self.robot_body.get_orientation()
         new_orn = qmult((euler2quat(delta, 0, 0)), orn)
         self.robot_body.set_orientation(new_orn)

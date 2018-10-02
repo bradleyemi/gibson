@@ -177,6 +177,25 @@ class BaseRobotEnv(BaseEnv):
     foot_ground_object_names = set(["buildingFloor"])  # to distinguish ground and other objects
     joints_at_limit_cost = -0.1 # discourage stuck joints
 
+    
+    def step_physics(self, a):
+        self.nframe += 1
+        if not self.scene.multiplayer:
+            self.robot.apply_action(a)
+            self.scene.global_step()
+        self.rewards = self._rewards(a)
+        done = self._termination()
+        self.reward += sum(self.rewards)
+        self.eps_reward += sum(self.rewards)
+        if self.gui:
+            pos = self.robot._get_scaled_position()
+            orn = self.robot.get_orientation()
+            pos = (pos[0], pos[1], pos[2] + self.tracking_camera['z_offset'])
+            pos = np.array(pos)
+            dist = self.tracking_camera['distance'] / self.robot.mjcf_scaling
+            p.resetDebugVisualizerCamera(dist, self.tracking_camera['yaw'], self.tracking_camera['pitch'], pos)
+        return {}, sum(self.rewards), done, {}
+
 
     def _step(self, a):
         self.nframe += 1

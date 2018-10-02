@@ -1,5 +1,5 @@
 from gibson.envs.env_modalities import CameraRobotEnv, BaseRobotEnv, SemanticRobotEnv
-from gibson.envs.husky_env import HuskyNavigateSpeedControlEnv
+from gibson.envs.husky_env import HuskyNavigateEnv
 from gibson.core.physics.robot_locomotors import Husky
 from gibson.data.datasets import get_model_path
 from gibson import assets
@@ -15,7 +15,7 @@ tracking_camera = {
     'pitch': -20
 }
 
-class HuskyRandomEnv(HuskyNavigateSpeedControlEnv):
+class HuskyRandomEnv(HuskyNavigateEnv):
     def __init__(self, config, gpu_count=0):
         self.config = self.parse_config(config)
         assert(self.config["envname"] == self.__class__.__name__ or self.config["envname"] == "TestEnv")
@@ -52,7 +52,7 @@ class HuskyRandomEnv(HuskyNavigateSpeedControlEnv):
         return super(HuskyRandomEnv, self)._reset()
 
 
-class HuskyMultiSceneEnv(HuskyNavigateSpeedControlEnv):
+class HuskyMultiSceneEnv(HuskyNavigateEnv):
     def __init__(self, config, gpu_count=0):
         self.config = self.parse_config(config)
         assert(self.config["envname"] == self.__class__.__name__ or self.config["envname"] == "TestEnv")

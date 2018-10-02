@@ -96,12 +96,12 @@ class HuskyNavigateEnv(CameraRobotEnv):
         close_to_target = 0
         
         #print(self.robot.dist_to_target())
-        if self.robot.dist_to_target() < 3 and self.nframe == self.config["episode_length"]:
-            close_to_target = 50.
-        if self.robot.dist_to_target() < 2 and self.nframe == self.config["episode_length"]:
-            close_to_target = 75.
-        if self.robot.dist_to_target() < 1:
-            close_to_target = 100.
+        #if self.robot.dist_to_target() < 3 and self.nframe == self.config["episode_length"]:
+        #    close_to_target = 50.
+        #if self.robot.dist_to_target() < 2 and self.nframe == self.config["episode_length"]:
+        #    close_to_target = 75.
+        if self.robot.dist_to_target() < 0.4:
+            close_to_target = 10.
 
         angle_cost = self.robot.angle_cost()
 
@@ -112,7 +112,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
         debugmode = 0
         if debugmode:
             print("angle cost", angle_cost)
-        alive = -0.25
+        alive = -0.025
         debugmode = 0
         if (debugmode):
             print("Wall contact points", len(wall_contact))
@@ -138,7 +138,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
         
         alive = len(self.robot.parts['top_bumper_link'].contact_list()) == 0
 
-        done = self.nframe >= self.config["episode_length"] or self.robot.dist_to_target() < 1
+        done = self.nframe >= self.config["episode_length"] or self.robot.dist_to_target() < 0.4
         #if done:
         #    print("Episode reset")
         return done
