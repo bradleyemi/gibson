@@ -106,14 +106,14 @@ def play(env, transpose=True, zoom=None, callback=None, keys_to_action=None):
     while running:
         if do_restart:
             do_restart = False
-            env.reset()
+            env._reset()
             pressed_keys = []
             continue
         if len(pressed_keys) == 0:
             action = keys_to_action[()]
             obs, rew, env_done, info = env.step(action)
             if env_done:
-                obs = env.reset()
+                obs = env._reset()
             '''
             with Profiler("Play Env: step"):
                 start = time.time()
@@ -128,7 +128,7 @@ def play(env, transpose=True, zoom=None, callback=None, keys_to_action=None):
             prev_obs = obs
             obs, rew, env_done, info = env.step(action)
             if env_done:
-                obs = env.reset()
+                obs = env._reset()
             '''
             with Profiler("Play Env: step"):
                 start = time.time()

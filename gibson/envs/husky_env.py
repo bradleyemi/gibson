@@ -95,12 +95,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
         joints_at_limit_cost = float(self.joints_at_limit_cost * self.robot.joints_at_limit)
         close_to_target = 0
         
-        #print(self.robot.dist_to_target())
-        #if self.robot.dist_to_target() < 3 and self.nframe == self.config["episode_length"]:
-        #    close_to_target = 50.
-        #if self.robot.dist_to_target() < 2 and self.nframe == self.config["episode_length"]:
-        #    close_to_target = 75.
-        if self.robot.dist_to_target() < 0.4:
+        if self.robot.dist_to_target() < 0.15:
             close_to_target = 10.
 
         angle_cost = self.robot.angle_cost()
@@ -138,7 +133,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
         
         alive = len(self.robot.parts['top_bumper_link'].contact_list()) == 0
 
-        done = self.nframe >= self.config["episode_length"] or self.robot.dist_to_target() < 0.4
+        done = self.nframe >= self.config["episode_length"] or self.robot.dist_to_target() < 0.15
         #if done:
         #    print("Episode reset")
         return done

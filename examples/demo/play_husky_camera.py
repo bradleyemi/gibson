@@ -1,9 +1,9 @@
-from gibson.envs.husky_env import HuskyNavigateEnv
+from gibson.envs.exploration_env import HuskyExplorationEnv
 from gibson.utils.play import play
 import os
 
-config_file = os.path.join(os.path.dirname(os.path.realpath(__file__)), '..', 'configs', 'play', 'play_husky_camera.yaml')
-print(config_file)
+config_file = "/home/bradleyemi/svl/visual-cortex-parent/teas/teas/env/gibson/husky_explore.yaml"
+start_locations_file = "/home/bradleyemi/svl/visual-cortex-parent/teas/teas/env/gibson/Wiconisco_start_locations.csv"
 
 
 if __name__ == '__main__':
@@ -13,5 +13,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     #env = HuskyNavigateEnv(human=True, timestep=timestep, frame_skip=frame_skip, mode="RGB", is_discrete = True, resolution=args.resolution)
-    env = HuskyNavigateEnv(config=args.config, gpu_count = 0)
+    env = HuskyExplorationEnv(config=args.config, gpu_count = 0, start_locations_file=start_locations_file)
     play(env, zoom=4)
