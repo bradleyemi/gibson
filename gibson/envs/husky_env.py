@@ -107,7 +107,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
         debugmode = 0
         if debugmode:
             print("angle cost", angle_cost)
-        alive = -0.025
+        #alive = 0.025
         debugmode = 0
         if (debugmode):
             print("Wall contact points", len(wall_contact))
@@ -123,17 +123,21 @@ class HuskyNavigateEnv(CameraRobotEnv):
             #print("feet_collision_cost")
             #print(feet_collision_cost)
 
-        rewards = [alive, close_to_target]
+        rewards = [progress, close_to_target]
         return rewards
 
     def _termination(self, debugmode=False):
-        height = self.robot.get_position()[2]
-        pitch = self.robot.get_rpy()[1]
-        alive = float(self.robot.alive_bonus(height, pitch))
-        
-        alive = len(self.robot.parts['top_bumper_link'].contact_list()) == 0
+        z = self.robot.get_position()[2]
+        z_initial = self.config["initial_pos"][2]
+        roll, pitch = self.robot.get_rpy()[0:2]
+        if (abs(roll) > 1.22):
+            print("Agent roll too high")
+        if (abs(pitch) > 1.22):
+            print("Agent pitch too high")
+        if (abs(z - z_initial) > 0.5):
+            print("Agent fell off")
 
-        done = self.nframe >= self.config["episode_length"] or self.robot.dist_to_target() < 0.15
+        done = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5 or self.nframe >= self.config["episode_length"] or self.robot.dist_to_target() < 0.15
         #if done:
         #    print("Episode reset")
         return done
