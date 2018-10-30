@@ -44,7 +44,17 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
         if self.occupancy_map[x_idx + quadrant[0], y_idx + quadrant[1]] == 0:
             self.occupancy_map[x_idx + quadrant[0], y_idx + quadrant[1]] = 1.
             new_block = 1.
-        return [new_block]
+
+        z = self.robot.get_position()[2]
+        z_initial = self.config["initial_pos"][2]
+        roll, pitch = self.robot.get_rpy()[0:2]
+        death = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
+        if death:
+            death_penalty = -10.0
+        else:
+            death_penalty = 0.0
+
+        return [new_block, death_penalty]
     
     def _step(self, action):
         obs, rew, done, info = HuskyNavigateEnv._step(self, action)

@@ -515,11 +515,11 @@ class Husky(WalkerBase):
 
     def setup_keys_to_action(self):
         self.keys_to_action = {
-            #(ord('w'), ): 0, ## forward
+            (ord('w'), ): 0, ## forward
             #(ord('s'), ): 1, ## backward
             (ord('d'), ): 1, ## turn right
             (ord('a'), ): 2, ## turn left
-            (): 0
+            (): 3
         }
 
     def calc_state(self):
