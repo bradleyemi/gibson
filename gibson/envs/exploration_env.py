@@ -2,6 +2,8 @@ from gibson.envs.husky_env import HuskyNavigateEnv
 import numpy as np
 from scipy.misc import imresize
 import pickle
+import math
+
 
 class HuskyExplorationEnv(HuskyNavigateEnv):
     def __init__(self, config, gpu_count=0, start_locations_file=None):
@@ -35,8 +37,8 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
         x, y = position[0:2]
         orientation = self.robot.get_rpy()[2]
         quadrant = self.get_quadrant(orientation)
-        x_idx = np.searchsorted(self.x_vals, x)
-        y_idx = np.searchsorted(self.y_vals, y)
+        x_idx = int((x - self.map_x_range[0]) / self.cell_size)
+        y_idx = int((y - self.map_y_range[0]) / self.cell_size)
         new_block = 0.
         if (x_idx + quadrant[0] >= self.x_vals.shape[0]) or (x_idx + quadrant[0] < 0) or \
            (y_idx + quadrant[1] >= self.y_vals.shape[0]) or (y_idx + quadrant[1] < 0):
@@ -94,4 +96,62 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
     def render_map_rgb(self):
         x = self.render_map()
         return np.repeat(x[:,:,np.newaxis], 3, axis=2)
+
+
+class HuskyVisualExplorationEnv(HuskyExplorationEnv):
+    def __init__(self, config, gpu_count=0, start_locations_file=None):
+        HuskyExplorationEnv.__init__(self, config, gpu_count, start_locations_file)
+        self.min_depth = 0.
+        self.max_depth = 100.
+        self.fov = self.config["fov"]
+        self.screen_dim = self.config["resolution"]
+
+    def _step(self, action):
+        orig_found = np.sum(self.occupancy_map)
+        obs, rew, done, info = HuskyNavigateEnv._step(self, action)
+        self._update_occupancy_map(obs['depth'])
+        rew = np.sum(self.occupancy_map) - orig_found
+        obs["map"] = self.render_map()
+        return obs, rew, done, info
+
+    def _update_occupancy_map(self, depth_image):
+        clipped_depth_image = np.clip(depth_image, self.min_depth, self.max_depth)
+        xyz = self._reproject_depth_image(depth_image.squeeze())
+        xx, yy = self.rotate_origin_only(xyz[self.screen_dim//2:, self.screen_dim//2, :], math.radians(90) - math.radians(self.robot.get_rpy()[2]))
+        xx += self.robot.get_position()[0]
+        yy += self.robot.get_position()[1]
+        for x, y in zip(xx, yy):
+            self.insert_occupancy_map(x, y)
+        #self.insert_occupancy_map(self.robot.get_position()[0], self.robot.get_position()[1])
+
+    def insert_occupancy_map(self, x, y):
+        idx_x = int((x - self.map_x_range[0]) / self.cell_size)
+        idx_y = int((y - self.map_y_range[0]) / self.cell_size)
+        idx_x = np.clip(idx_x, 0, self.x_vals.shape[0] - 1)
+        idx_y = np.clip(idx_y, 0, self.y_vals.shape[0] - 1)
+        if idx_y < 0 or idx_y < 0:
+            raise ValueError("Trying to set occupancy in grid cell ({}, {})".format(idx_x, idx_y))
+        self.occupancy_map[idx_x, idx_y] = 1
+        return idx_x, idx_y
+
+
+    def _reproject_depth_image(self, depth, unit_scale=3.0):
+        """Transform a depth image into a point cloud with one point for each
+        pixel in the image, using the camera transform for a camera
+        centred at cx, cy with field of view fx, fy.
+        """
+        rows, cols = depth.shape
+        c, r = np.meshgrid(np.arange(cols), np.arange(rows), sparse=True)
+        y = depth * unit_scale
+        x = y * ((c - self.screen_dim // 2) / self.fov / self.screen_dim // 2)
+        z = y * ((r - self.screen_dim // 2) / self.fov / self.screen_dim // 2)
+        return np.dstack((x, y, z))
+
+    def rotate_origin_only(self, xy, radians):
+        x, y = xy[:,:2].T
+        xx = x * math.cos(radians) + y * math.sin(radians)
+        yy = -x * math.sin(radians) + y * math.cos(radians)
+        return xx, yy
+
+
 

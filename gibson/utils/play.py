@@ -111,7 +111,7 @@ def play(env, transpose=True, zoom=None, callback=None, keys_to_action=None):
             continue
         if len(pressed_keys) == 0:
             action = keys_to_action[()]
-            obs, rew, env_done, info = env.step(action)
+            obs, rew, env_done, info = env._step(action)
             if env_done:
                 obs = env._reset()
             '''
@@ -126,7 +126,7 @@ def play(env, transpose=True, zoom=None, callback=None, keys_to_action=None):
         for p_key in pressed_keys:
             action = keys_to_action[(p_key, )]
             prev_obs = obs
-            obs, rew, env_done, info = env.step(action)
+            obs, rew, env_done, info = env._step(action)
             if env_done:
                 obs = env._reset()
             '''
