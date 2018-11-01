@@ -30,7 +30,7 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
         elif angle > -3 * np.pi / 4 and angle <= -np.pi / 4:
             return (0,-1)
         else:
-            return (0,-1)
+            return (-1,0)
 
     def _rewards(self, action=None, debugmode=False):
         position = self.robot.get_position()
@@ -102,7 +102,7 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
     def __init__(self, config, gpu_count=0, start_locations_file=None):
         HuskyExplorationEnv.__init__(self, config, gpu_count, start_locations_file)
         self.min_depth = 0.
-        self.max_depth = 100.
+        self.max_depth = 2.5
         self.fov = self.config["fov"]
         self.screen_dim = self.config["resolution"]
 
@@ -112,17 +112,18 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
         self._update_occupancy_map(obs['depth'])
         rew = np.sum(self.occupancy_map) - orig_found
         obs["map"] = self.render_map()
+        self.reward += rew
+        self.eps_reward += rew
         return obs, rew, done, info
 
     def _update_occupancy_map(self, depth_image):
         clipped_depth_image = np.clip(depth_image, self.min_depth, self.max_depth)
         xyz = self._reproject_depth_image(depth_image.squeeze())
-        xx, yy = self.rotate_origin_only(xyz[self.screen_dim//2:, self.screen_dim//2, :], math.radians(90) - math.radians(self.robot.get_rpy()[2]))
+        xx, yy = self.rotate_origin_only(xyz[self.screen_dim//2:, self.screen_dim//2, :], math.radians(90) - self.robot.get_rpy()[2])
         xx += self.robot.get_position()[0]
         yy += self.robot.get_position()[1]
         for x, y in zip(xx, yy):
             self.insert_occupancy_map(x, y)
-        #self.insert_occupancy_map(self.robot.get_position()[0], self.robot.get_position()[1])
 
     def insert_occupancy_map(self, x, y):
         idx_x = int((x - self.map_x_range[0]) / self.cell_size)
@@ -135,7 +136,7 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
         return idx_x, idx_y
 
 
-    def _reproject_depth_image(self, depth, unit_scale=3.0):
+    def _reproject_depth_image(self, depth, unit_scale=1.0):
         """Transform a depth image into a point cloud with one point for each
         pixel in the image, using the camera transform for a camera
         centred at cx, cy with field of view fx, fy.
