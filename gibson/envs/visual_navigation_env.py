@@ -62,7 +62,7 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         depth = copy(obs["depth"])
         depth[depth == 0] = np.inf
         self.cube_image = copy(obs["rgb_filled"])
-        self.cube_image[cube_idx < depth.squeeze()] = np.array([0, 255, 0])
+        self.cube_image[cube_idx < depth.squeeze()] = np.array([0, 159, 107])
         return self.cube_image
 
     def _reset(self):
