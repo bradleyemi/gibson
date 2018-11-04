@@ -88,20 +88,20 @@ class WalkerBase(BaseRobot):
         new_pos = np.array(delta) + self.get_position()
         self.robot_body.reset_position(new_pos)
 
-    def move_forward(self, forward=0.07):
+    def move_forward(self, forward=0.14):
         x, y, z, w = self.robot_body.get_orientation()
         self.move_by(quat2mat([w, x, y, z]).dot(np.array([forward, 0, 0])))
         
-    def move_backward(self, backward=0.07):
+    def move_backward(self, backward=0.14):
         x, y, z, w = self.robot_body.get_orientation()
         self.move_by(quat2mat([w, x, y, z]).dot(np.array([-backward, 0, 0])))
 
-    def turn_left(self, delta=0.06):
+    def turn_left(self, delta=0.24):
         orn = self.robot_body.get_orientation()
         new_orn = qmult((euler2quat(-delta, 0, 0)), orn)
         self.robot_body.set_orientation(new_orn)
 
-    def turn_right(self, delta=0.06):
+    def turn_right(self, delta=0.24):
         orn = self.robot_body.get_orientation()
         new_orn = qmult((euler2quat(delta, 0, 0)), orn)
         self.robot_body.set_orientation(new_orn)
@@ -458,10 +458,10 @@ class Husky(WalkerBase):
             assert(self.is_discrete)
 
         if self.is_discrete:
-            self.action_space = gym.spaces.Discrete(4)        
+            self.action_space = gym.spaces.Discrete(3)        
             self.torque = 0.03
             if self.ideal_position_control:
-                self.action_list = [self.move_forward, self.turn_right, self.turn_left, lambda: None]
+                self.action_list = [self.move_forward, self.turn_right, self.turn_left]
             else:
                 self.action_list = [[self.torque, self.torque, self.torque, self.torque],
                                     [-self.torque, -self.torque, -self.torque, -self.torque],

@@ -132,7 +132,7 @@ class HuskyNavigateEnv(CameraRobotEnv):
             #print("feet_collision_cost")
             #print(feet_collision_cost)
 
-        rewards = [alive, death_penalty, close_to_target]
+        rewards = [alive, progress, death_penalty, close_to_target]
         return rewards
 
     def _termination(self, debugmode=False):
