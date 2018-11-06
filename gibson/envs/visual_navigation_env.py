@@ -8,8 +8,13 @@ from copy import copy
 
 
 class HuskyVisualNavigateEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, start_locations_file=None):
+    def __init__(self, config, gpu_count=0, valid_locations=None):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
+        self.use_valid_locations = valid_locations is not None
+        if self.use_valid_locations:
+            print("Using valid locations!")
+            self.valid_locations = self.get_valid_locations(valid_locations)
+            self.n_locations = self.valid_locations.shape[0]
         self.min_target_x, self.max_target_x = self.config["x_target_range"]
         self.min_target_y, self.max_target_y = self.config["y_target_range"]
         self.min_agent_x, self.max_agent_x = self.config["x_boundary"]
@@ -24,6 +29,9 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.target_y = np.random.uniform(self.min_target_y, self.max_target_y)
         self.min_target_distance = self.config["min_target_distance"]
         self.max_target_distance = self.config["max_target_distance"]
+    
+    def get_valid_locations(self, valid_locations):
+        return np.loadtxt(valid_locations, delimiter=',')
 
     def _close_to_goal(self):
         target_vector = np.array([self.target_x, self.target_y])
@@ -51,7 +59,7 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         obs["rgb_filled"] = self._add_cube_into_image(obs, [self.target_x, self.target_y, self.default_z])
         return obs, rew, done, info
 
-    def _add_cube_into_image(self, obs, location, color=[95,158,160]):
+    def _add_cube_into_image(self, obs, location, color=[20,200,200]):
         cube = Cube(origin=np.array(location), scale=self.cube_size)
         self.cube_image = copy(obs["rgb_filled"])
         roll, pitch, yaw = self.robot.get_rpy()
@@ -62,22 +70,43 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         cube_idx = draw_cube(cube, world_to_image_mat, size*2, size*2, fast_depth=True)
         self.cube_image[cube_idx < self.depth] = np.array(color)
         return self.cube_image
+    
+    def sample_valid_location(self):
+        index = np.random.choice(range(self.n_locations))
+        return self.valid_locations[index,:]
+
+    def select_new_target(self):
+        if self.use_valid_locations:
+            location = self.sample_valid_location()
+            print("New target is:", location)
+            return location
+        else:
+            return np.random.uniform(self.min_target_x, self.max_target_x), np.random.uniform(self.min_target_y, self.max_target_y)
+
+    def select_new_agent_location(self):
+        attempts = 0
+        while attempts < 100:
+            if self.use_valid_locations:
+                spawn_x, spawn_y = self.sample_valid_location()
+            else:
+                spawn_x = np.random.uniform(self.min_spawn_x, self.max_spawn_x)
+                spawn_y = np.random.uniform(self.min_spawn_y, self.max_spawn_y)
+            distance = np.linalg.norm(np.array([spawn_x, spawn_y]) - np.array([self.target_x, self.target_y]))
+            if distance < self.max_target_distance and distance > self.min_target_distance:
+                break
+            attempts += 1
+        if attempts == 100:
+            raise Exception("Could not find a valid spawn location. Try expanding the target distance range.")
+        print("New agent location is:", spawn_x, spawn_y)
+        return [spawn_x, spawn_y, self.default_z]
 
     def _reset(self):
         obs = HuskyNavigateEnv._reset(self)
         self.cube_image = copy(obs["rgb_filled"])
         self.depth = copy(obs["depth"]).squeeze()
+        self.target_x, self.target_y = self.select_new_target()
         obs["rgb_filled"] = self._add_cube_into_image(obs, [self.target_x, self.target_y, self.default_z])
-        
-        self.target_x = np.random.uniform(self.min_target_x, self.max_target_x)
-        self.target_y = np.random.uniform(self.min_target_y, self.max_target_y)
-        while True:
-            spawn_x = np.random.uniform(self.min_spawn_x, self.max_spawn_x)
-            spawn_y = np.random.uniform(self.min_spawn_y, self.max_spawn_y)
-            distance = np.linalg.norm(np.array([spawn_x, spawn_y]) - np.array([self.target_x, self.target_y]))
-            if distance < self.max_target_distance and distance > self.min_target_distance:
-                break
-        self.config["initial_pos"] = [spawn_x, spawn_y, self.default_z]
+        self.config["initial_pos"] = self.select_new_agent_location()
         return obs
 
     def _termination(self, debugmode=False):
@@ -91,9 +120,9 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
             print("Agent pitch too high")
         if (abs(z - z_initial) > 0.5):
             print("Agent fell off")
-        out_of_bounds = x < self.min_agent_x or x > self.max_agent_x or y < self.min_agent_y or y > self.max_agent_y
+        #out_of_bounds = x < self.min_agent_x or x > self.max_agent_x or y < self.min_agent_y or y > self.max_agent_y
         dead = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
-        done = dead or out_of_bounds or self.nframe >= self.config["episode_length"] or self._close_to_goal()
+        done = dead or self.nframe >= self.config["episode_length"] or self._close_to_goal()
         return done
 
 
