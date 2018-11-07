@@ -183,12 +183,12 @@ class HuskyVisualObstacleAvoidanceEnv(HuskyVisualNavigateEnv):
         dead = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
         dead_penalty = 0.0
         if dead:
-            dead_penalty = -10.0
+            dead_penalty = 0.0
         
         close_to_goal = 0.
         if self._close_to_goal():
             close_to_goal = 10.
-        alive = 0.0
+        alive = -0.025
 
         close_to_obstacles = 0.
         if self.close_to_obstacles():
@@ -217,17 +217,24 @@ class HuskyVisualObstacleAvoidanceEnv(HuskyVisualNavigateEnv):
         obs = HuskyNavigateEnv._reset(self)
         self.cube_image = copy(obs["rgb_filled"])
         self.depth = copy(obs["depth"]).squeeze()
-        self.target_x = np.random.uniform(self.min_target_x, self.max_target_x)
-        self.target_y = np.random.uniform(self.min_target_y, self.max_target_y)
-        while True:
+        attempts = 0
+        #print("Generating target and spawn locations")
+        while attempts < 100:
+            self.target_x = np.random.uniform(self.min_target_x, self.max_target_x)
+            self.target_y = np.random.uniform(self.min_target_y, self.max_target_y)
             spawn_x = np.random.uniform(self.min_spawn_x, self.max_spawn_x)
             spawn_y = np.random.uniform(self.min_spawn_y, self.max_spawn_y)
             distance = np.linalg.norm(np.array([spawn_x, spawn_y]) - np.array([self.target_x, self.target_y]))
             if distance < self.max_target_distance and distance > self.min_target_distance:
                 break
+            attempts += 1
+        if attempts == 100:
+            raise Exception("Agent could not be spawned. Try expanding the min and max target range.")
         self.config["initial_pos"] = [spawn_x, spawn_y, self.default_z]
         obs["rgb_filled"] = self._add_target_into_image(obs, [self.target_x, self.target_y, self.default_z], color=self.target_color)
+        #print("Generating obstacles")
         self.reset_cube_locations()
+        x, y = self.config["initial_pos"][0:2]
         for location in self.cube_locations:
             obs["rgb_filled"] = self._add_obstacle_into_image(obs, location, color=self.obstacle_color)
         return obs
@@ -240,14 +247,28 @@ class HuskyVisualObstacleAvoidanceEnv(HuskyVisualNavigateEnv):
         return False
 
     def reset_cube_locations(self):
-        self.cube_locations = []
-        for i in range(self.num_obstacles):
-            new_location = self.get_new_cube_spawn_location(self.cube_locations)
-            self.cube_locations.append(new_location)      
+        attempts = 0
+        while attempts < 10:
+            #print("Attempt number", attempts, "at resetting cube locations")
+            attempts += 1
+            try:
+                self.cube_locations = []
+                for i in range(self.num_obstacles):
+                    #print(self.cube_locations)
+                    new_location = self.get_new_cube_spawn_location(self.cube_locations)
+                    self.cube_locations.append(new_location)   
+                break
+            except:
+                continue 
+            
+        if attempts == 10:
+            raise Exception("Could not reset the cube locations.")  
 
     def get_new_cube_spawn_location(self, cubes):
         attempts = 0
         while attempts < 100:
+            #print("attempt number", attempts, "at spawning this cube")
+            attempts += 1
             spawn_cube_x = np.random.uniform(self.min_spawn_x, self.max_spawn_x)
             spawn_cube_y = np.random.uniform(self.min_spawn_y, self.max_spawn_y)
             # Make sure it's within correct range of agent

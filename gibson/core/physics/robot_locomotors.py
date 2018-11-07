@@ -1,4 +1,4 @@
-from gibson.core.physics.robot_bases import BaseRobot
+from gibson.core.physics.robot_bases import BaseRobot, quatToXYZW
 import numpy as np
 import pybullet as p
 import os
@@ -88,9 +88,11 @@ class WalkerBase(BaseRobot):
         new_pos = np.array(delta) + self.get_position()
         self.robot_body.reset_position(new_pos)
 
-    def move_forward(self, forward=0.14):
+    def move_forward(self, forward=0.10):
         x, y, z, w = self.robot_body.get_orientation()
         self.move_by(quat2mat([w, x, y, z]).dot(np.array([forward, 0, 0])))
+        yaw = self.robot_body.bp_pose.rpy()[2]
+        self.robot_body.reset_orientation(quatToXYZW(euler2quat(0, 0, yaw), 'wxyz'))
         
     def move_backward(self, backward=0.14):
         x, y, z, w = self.robot_body.get_orientation()
