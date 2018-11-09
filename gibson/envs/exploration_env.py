@@ -1,5 +1,6 @@
 from gibson.envs.husky_env import HuskyNavigateEnv
 import numpy as np
+import scipy.ndimage
 from scipy.misc import imresize
 import pickle
 import math
@@ -60,7 +61,8 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
     
     def _step(self, action):
         obs, rew, done, info = HuskyNavigateEnv._step(self, action)
-        obs["map"] = self.render_map()
+        yaw = self.robot.get_rpy()[2]
+        obs["map"] = self.render_map(rotate=True, rotate_angle=yaw)
         return obs, rew, done, info
 
     def _reset(self):
@@ -69,7 +71,8 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
             self.config["initial_pos"] = [new_start_location[0], new_start_location[1], new_start_location[2]]
         obs = HuskyNavigateEnv._reset(self)
         self.occupancy_map = np.zeros((self.x_vals.shape[0], self.y_vals.shape[0]))
-        obs["map"] = self.render_map()
+        yaw = self.robot.get_rpy()[2]
+        obs["map"] = self.render_map(rotate=True, rotate_angle=yaw, translate=True)
         return obs
 
     def _termination(self, debugmode=False):
@@ -87,14 +90,23 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
         return done
 
 
-    def render_map(self):
+    def render_map(self, rotate=False, rotate_angle=0.0, translate=False):
         x = self.occupancy_map * 255.
         x = x.astype(np.uint8)
+        if translate:
+            position = self.robot.get_position()
+            x_idx = int((position[0] - self.map_x_range[0]) / self.cell_size) - (self.x_vals.shape[0] // 2)
+            y_idx = int((position[1] - self.map_y_range[0]) / self.cell_size) - (self.y_vals.shape[0] // 2)
+            x = scipy.ndimage.shift(x, np.array([-x_idx, -y_idx]))
+
         x = imresize(x, (self.config["resolution"], self.config["resolution"]))
+        if rotate:
+            x = scipy.ndimage.rotate(x, 180.0 - math.degrees(rotate_angle), reshape=False)
         return x
 
     def render_map_rgb(self):
-        x = self.render_map()
+        yaw = self.robot.get_rpy()[2]
+        x = self.render_map(rotate=True, rotate_angle=yaw, translate=True)
         return np.repeat(x[:,:,np.newaxis], 3, axis=2)
 
 
@@ -102,7 +114,7 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
     def __init__(self, config, gpu_count=0, start_locations_file=None):
         HuskyExplorationEnv.__init__(self, config, gpu_count, start_locations_file)
         self.min_depth = 0.
-        self.max_depth = 2.5
+        self.max_depth = 0.5
         self.fov = self.config["fov"]
         self.screen_dim = self.config["resolution"]
 
@@ -118,7 +130,7 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
 
     def _update_occupancy_map(self, depth_image):
         clipped_depth_image = np.clip(depth_image, self.min_depth, self.max_depth)
-        xyz = self._reproject_depth_image(depth_image.squeeze())
+        xyz = self._reproject_depth_image(clipped_depth_image.squeeze())
         xx, yy = self.rotate_origin_only(xyz[self.screen_dim//2:, self.screen_dim//2, :], math.radians(90) - self.robot.get_rpy()[2])
         xx += self.robot.get_position()[0]
         yy += self.robot.get_position()[1]
