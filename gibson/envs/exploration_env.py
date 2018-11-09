@@ -12,16 +12,18 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
         self.cell_size = self.config["cell_size"]
         self.map_x_range = self.config["map_x_range"]
         self.map_y_range = self.config["map_y_range"]
+        self.default_z = self.config["initial_pos"][2]
 
         self.x_vals = np.arange(self.map_x_range[0], self.map_x_range[1], self.cell_size)
         self.y_vals = np.arange(self.map_y_range[0], self.map_y_range[1], self.cell_size)
         self.occupancy_map = np.zeros((self.x_vals.shape[0], self.y_vals.shape[0]))
         
         self.start_locations_file = start_locations_file
+        self.use_valid_locations = False
         if self.start_locations_file is not None:
-            with open(self.start_locations_file, 'r') as f:
-                self.points = np.loadtxt(f, delimiter=',')
-                self.n_points = self.points.shape[0]
+            self.valid_locations = np.loadtxt(self.start_locations_file, delimiter=',')
+            self.n_points = self.valid_locations.shape[0]
+            self.use_valid_locations = True
 
     def get_quadrant(self, angle):
         if angle > np.pi / 4 and angle <= 3 * np.pi / 4:
@@ -48,31 +50,23 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
             self.occupancy_map[x_idx + quadrant[0], y_idx + quadrant[1]] = 1.
             new_block = 1.
 
-        z = self.robot.get_position()[2]
-        z_initial = self.config["initial_pos"][2]
-        roll, pitch = self.robot.get_rpy()[0:2]
-        death = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
-        if death:
-            death_penalty = -10.0
-        else:
-            death_penalty = 0.0
-
-        return [new_block, death_penalty]
+        return [new_block]
     
     def _step(self, action):
         obs, rew, done, info = HuskyNavigateEnv._step(self, action)
         yaw = self.robot.get_rpy()[2]
-        obs["map"] = self.render_map(rotate=True, rotate_angle=yaw)
+        obs["map"] = self.render_map(rotate=True, rotate_angle=yaw, translate=True)
         return obs, rew, done, info
 
     def _reset(self):
         if self.start_locations_file is not None:
-            new_start_location = self.points[np.random.randint(self.n_points), :]
-            self.config["initial_pos"] = [new_start_location[0], new_start_location[1], new_start_location[2]]
+            new_start_location = self.valid_locations[np.random.randint(self.n_points), :]
+            self.config["initial_pos"] = [new_start_location[0], new_start_location[1], self.default_z]
         obs = HuskyNavigateEnv._reset(self)
         self.occupancy_map = np.zeros((self.x_vals.shape[0], self.y_vals.shape[0]))
         yaw = self.robot.get_rpy()[2]
         obs["map"] = self.render_map(rotate=True, rotate_angle=yaw, translate=True)
+        
         return obs
 
     def _termination(self, debugmode=False):
@@ -86,7 +80,7 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
             print("Agent pitch too high")
         if (abs(z - z_initial) > 0.5):
             print("Agent fell off")
-        done = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5 or self.nframe >= self.config["episode_length"]
+        done = abs(z - z_initial) > 0.5 or self.nframe >= self.config["episode_length"] # or abs(roll) > 1.22 or abs(pitch) > 1.22
         return done
 
 
@@ -102,27 +96,27 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
         x = imresize(x, (self.config["resolution"], self.config["resolution"]))
         if rotate:
             x = scipy.ndimage.rotate(x, 180.0 - math.degrees(rotate_angle), reshape=False)
-        return x
+        return x[:,:,np.newaxis]
 
     def render_map_rgb(self):
         yaw = self.robot.get_rpy()[2]
         x = self.render_map(rotate=True, rotate_angle=yaw, translate=True)
-        return np.repeat(x[:,:,np.newaxis], 3, axis=2)
+        return np.repeat(x, 3, axis=2)
 
 
 class HuskyVisualExplorationEnv(HuskyExplorationEnv):
     def __init__(self, config, gpu_count=0, start_locations_file=None):
         HuskyExplorationEnv.__init__(self, config, gpu_count, start_locations_file)
         self.min_depth = 0.
-        self.max_depth = 0.5
+        self.max_depth = 1.0
         self.fov = self.config["fov"]
         self.screen_dim = self.config["resolution"]
 
     def _step(self, action):
         orig_found = np.sum(self.occupancy_map)
-        obs, rew, done, info = HuskyNavigateEnv._step(self, action)
+        obs, _, done, info = HuskyExplorationEnv._step(self, action)
         self._update_occupancy_map(obs['depth'])
-        rew = np.sum(self.occupancy_map) - orig_found
+        rew = (np.sum(self.occupancy_map) - orig_found) * 0.1
         obs["map"] = self.render_map()
         self.reward += rew
         self.eps_reward += rew
