@@ -1,14 +1,19 @@
 from gibson.envs.husky_env import HuskyNavigateEnv
-from gibson.envs.cube_projection import Cube, generate_projection_matrix, draw_cube
+from gibson.envs.cube_projection import Cube, generate_projection_matrix, draw_cube, get_cube_depth_and_faces
 import numpy as np
 from scipy.misc import imresize
+from skimage.io import imread
+import skimage
 import pickle
 import math
 from copy import copy
+import os
+import matplotlib.pyplot as plt
+from gibson import assets
 
 
 class HuskyVisualNavigateEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, valid_locations=None):
+    def __init__(self, config, gpu_count=0, texture=True, valid_locations=None):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
         self.use_valid_locations = valid_locations is not None
         if self.use_valid_locations:
@@ -29,7 +34,18 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.target_y = np.random.uniform(self.min_target_y, self.max_target_y)
         self.min_target_distance = self.config["min_target_distance"]
         self.max_target_distance = self.config["max_target_distance"]
-    
+        self.use_texture = False
+        if texture:
+            self.use_texture = True
+            self.texture_path = os.path.join(os.path.dirname(os.path.abspath(assets.__file__)), "wood.jpg")
+            self.load_texture(self.texture_path)
+
+    def load_texture(self, texture_path):
+        wood = imread(texture_path)
+        size = self.config["resolution"]
+        self.texture_image = skimage.transform.resize(wood[:, 42:208], (size,size))
+        self.texture_points = np.array([[0.,0.,size,size],[size,0.,0.,size]]).T
+
     def get_valid_locations(self, valid_locations):
         return np.loadtxt(valid_locations, delimiter=',')
 
@@ -61,14 +77,28 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
 
     def _add_cube_into_image(self, obs, location, color=[20,200,200]):
         cube = Cube(origin=np.array(location), scale=self.cube_size)
-        self.cube_image = copy(obs["rgb_filled"])
+        self.cube_image = final = copy(obs["rgb_filled"])
         roll, pitch, yaw = self.robot.get_rpy()
         x, y, z = self.robot.eyes.get_position()
         size = self.config["resolution"] // 2
         fov = self.config["fov"]
         world_to_image_mat = generate_projection_matrix(x, y, z, yaw, pitch, roll, fov, fov, size, size)
-        cube_idx = draw_cube(cube, world_to_image_mat, size*2, size*2, fast_depth=True)
-        self.cube_image[cube_idx < self.depth] = np.array(color)
+        if self.use_texture:
+            masks, xx_faces, yy_faces = get_cube_depth_and_faces(cube, world_to_image_mat, size*2, size*2)
+            for face_mask, xx, yy in zip(masks, xx_faces, yy_faces):
+                transform = skimage.transform.ProjectiveTransform()
+                dest = np.array([yy,xx]).T
+                try:
+                    transform.estimate(self.texture_points, dest)
+                    self.new_img = skimage.transform.warp(self.texture_image, transform.inverse)
+                except:
+                    continue
+                img_mask = face_mask < self.depth
+                self.cube_image[img_mask] = np.array(self.new_img[img_mask] * 255, dtype=np.uint8)
+                self.depth[img_mask] = face_mask[img_mask]
+        else:
+            cube_idx = draw_cube(cube, world_to_image_mat, size*2, size*2, fast_depth=True)
+            self.cube_image[cube_idx < self.depth] = np.array(color)
         return self.cube_image
     
     def sample_valid_location(self):

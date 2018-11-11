@@ -94,7 +94,31 @@ def draw_cube(cube, world_to_image_mat, im_size_x, im_size_y, fast_depth=True, d
            raise NotImplementedError("We'd need to interpolate between the vertices")
        if np.any(valid_coords[idxs]):
            im[polygon(xx[idxs], yy[idxs], shape=im.shape)] = depth_to_fill
-   return im
+   return im, xx, yy
+
+def get_cube_depth_and_faces(cube, world_to_image_mat, im_size_x, im_size_y, fast_depth=True, debug=False):
+    depth_image = world_to_image_mat.dot(cube.homogeneous_verts.T).T
+    depth_image[:,:2] /= depth_image[:,2][:, np.newaxis]
+    xx, yy, depth_zz = depth_image.T
+    xx_in_range = np.logical_and(xx >= 0, xx < im_size_x)
+    yy_in_range = np.logical_and(yy >= 0, yy < im_size_y)
+    valid_coords = np.logical_and(xx_in_range, yy_in_range)
+    valid_coords = np.logical_and(valid_coords, depth_zz > 0)
+    xx_faces = []
+    yy_faces = []
+    masks = []
+    for i, idxs in enumerate(cube.cube_face_idxs):
+        im = np.full((im_size_x, im_size_y), np.inf)
+        if fast_depth:
+            depth_to_fill = np.abs(max(depth_zz[idxs])) # Just use the max depth of this face. Not accurate, but probably sufficient
+        else:
+            raise NotImplementedError("We'd need to interpolate between the vertices")
+        if np.any(valid_coords[idxs]):
+            im[polygon(xx[idxs], yy[idxs], shape=im.shape)] = depth_to_fill
+            xx_faces.append(xx[idxs])
+            yy_faces.append(yy[idxs])
+            masks.append(im)
+    return masks, xx_faces, yy_faces
 
 if __name__ == '__main__':
     x_world, y_world, z_world = -2.0, -0.9, 0.0
