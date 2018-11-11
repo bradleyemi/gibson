@@ -51,7 +51,8 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
 
     def _close_to_goal(self):
         target_vector = np.array([self.target_x, self.target_y])
-        return np.linalg.norm(self.robot.get_position()[0:2] - target_vector) < self.target_radius
+        distance = np.linalg.norm(self.robot.get_position()[0:2] - target_vector)
+        return distance < self.target_radius
 
     def _rewards(self, action=None, debugmode=False):
         x, y, z = self.robot.get_position()
@@ -59,14 +60,14 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         roll, pitch = self.robot.get_rpy()[0:2]
         dead = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
         dead_penalty = 0.0
-        if dead:
-            dead_penalty = -10.0
+        #if dead:
+        #    dead_penalty = -10.0
         
         close_to_goal = 0.
         if self._close_to_goal():
             close_to_goal = 10.
-        alive = 0.0
-        return [alive, dead_penalty, close_to_goal]
+        alive = -0.025
+        return [alive, close_to_goal]
     
     def _step(self, action):
         obs, rew, done, info = HuskyNavigateEnv._step(self, action)
@@ -128,15 +129,16 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         if attempts == 100:
             raise Exception("Could not find a valid spawn location. Try expanding the target distance range.")
         print("New agent location is:", spawn_x, spawn_y)
+        print("Distance to target:", distance)
         return [spawn_x, spawn_y, self.default_z]
 
     def _reset(self):
+        self.target_x, self.target_y = self.select_new_target()
+        self.config["initial_pos"] = self.select_new_agent_location()
         obs = HuskyNavigateEnv._reset(self)
         self.cube_image = copy(obs["rgb_filled"])
         self.depth = copy(obs["depth"]).squeeze()
-        self.target_x, self.target_y = self.select_new_target()
         obs["rgb_filled"] = self._add_cube_into_image(obs, [self.target_x, self.target_y, self.default_z])
-        self.config["initial_pos"] = self.select_new_agent_location()
         return obs
 
     def _termination(self, debugmode=False):
@@ -150,9 +152,9 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
             print("Agent pitch too high")
         if (abs(z - z_initial) > 0.5):
             print("Agent fell off")
-        #out_of_bounds = x < self.min_agent_x or x > self.max_agent_x or y < self.min_agent_y or y > self.max_agent_y
-        dead = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
-        done = dead or self.nframe >= self.config["episode_length"] or self._close_to_goal()
+        out_of_bounds = x < self.min_agent_x or x > self.max_agent_x or y < self.min_agent_y or y > self.max_agent_y
+        #dead = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
+        done = out_of_bounds or self.nframe >= self.config["episode_length"] or self._close_to_goal()
         return done
 
 
