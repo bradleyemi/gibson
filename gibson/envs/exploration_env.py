@@ -80,7 +80,7 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
             print("Agent pitch too high")
         if (abs(z - z_initial) > 0.5):
             print("Agent fell off")
-        done = abs(z - z_initial) > 0.5 or self.nframe >= self.config["episode_length"] # or abs(roll) > 1.22 or abs(pitch) > 1.22
+        done = self.nframe >= self.config["episode_length"] # or abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
         return done
 
 
@@ -107,8 +107,8 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
 class HuskyVisualExplorationEnv(HuskyExplorationEnv):
     def __init__(self, config, gpu_count=0, start_locations_file=None):
         HuskyExplorationEnv.__init__(self, config, gpu_count, start_locations_file)
-        self.min_depth = 0.
-        self.max_depth = 1.0
+        self.min_depth = 0.0
+        self.max_depth = 1.5
         self.fov = self.config["fov"]
         self.screen_dim = self.config["resolution"]
 
