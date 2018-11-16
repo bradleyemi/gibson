@@ -78,9 +78,9 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
             print("Agent roll too high")
         if (abs(pitch) > 1.22):
             print("Agent pitch too high")
-        if (abs(z - z_initial) > 0.5):
+        if (abs(z - z_initial) > 1.0):
             print("Agent fell off")
-        done = self.nframe >= self.config["episode_length"] # or abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
+        done = abs(z - z_initial) > 1.0 or self.nframe >= self.config["episode_length"] # or abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
         return done
 
 
