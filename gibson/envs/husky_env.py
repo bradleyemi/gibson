@@ -1,6 +1,6 @@
 from gibson.envs.env_modalities import CameraRobotEnv, BaseRobotEnv, SemanticRobotEnv
 from gibson.envs.env_bases import *
-from gibson.core.physics.robot_locomotors import Husky
+from gibson.core.physics.robot_locomotors import Husky, Turtlebot
 from transforms3d import quaternions
 import os
 import numpy as np
@@ -36,14 +36,24 @@ class HuskyNavigateEnv(CameraRobotEnv):
         CameraRobotEnv.__init__(self, self.config, gpu_count, 
                                 scene_type="stadium" if self.config["model_id"]=="stadium" else "building",
                                 tracking_camera=tracking_camera)
-
-        self.robot_introduce(Husky(self.config, env=self))
+        if "robot" in self.config.keys():
+            self.introduce_custom_robot()
+        else:
+            self.robot_introduce(Husky(self.config, env=self))
         self.scene_introduce()
         self.total_reward = 0
         self.total_frame = 0
         if self.config["ideal_position_control"]:
             for _ in range(100):
                 self.scene.global_step()
+    
+    def introduce_custom_robot(self):
+        if self.config["robot"] == 'Husky':
+            self.robot_introduce(Husky(self.config, env=self))
+            print("Robot camera pos", self.robot.eyes.get_position())
+        elif self.config["robot"] == 'Turtlebot':
+            self.robot_introduce(Turtlebot(self.config, env=self))
+            print("Robot camera pos", self.robot.eyes.get_position())
 
     def add_text(self, img):
         font = cv2.FONT_HERSHEY_SIMPLEX

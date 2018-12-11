@@ -624,15 +624,19 @@ class Turtlebot(WalkerBase):
                             control = 'velocity',
                             env=env)
         self.is_discrete = config["is_discrete"]
-
+        self.ideal_position_control = config["ideal_position_control"]
         if self.is_discrete:
-            self.action_space = gym.spaces.Discrete(5)
-            self.vel = 0.1
-            self.action_list = [[self.vel, self.vel],
-                                [-self.vel, -self.vel],
-                                [self.vel, -self.vel],
-                                [-self.vel, self.vel],
-                                [0, 0]]
+            if self.ideal_position_control:
+                self.action_space = gym.spaces.Discrete(3)
+                self.action_list = [self.move_forward, self.turn_right, self.turn_left]
+            else:
+                self.action_space = gym.spaces.Discrete(5)
+                self.vel = 0.1
+                self.action_list = [[self.vel, self.vel],
+                                    [-self.vel, -self.vel],
+                                    [self.vel, -self.vel],
+                                    [-self.vel, self.vel],
+                                    [0, 0]]
 
             self.setup_keys_to_action()
         else:
@@ -640,11 +644,15 @@ class Turtlebot(WalkerBase):
             self.action_space = gym.spaces.Box(-action_high, action_high)
 
     def apply_action(self, action):
-        if self.is_discrete:
-            realaction = self.action_list[action]
+        if self.ideal_position_control:
+            action_function = self.action_list[action]
+            action_function()
         else:
-            realaction = action
-        WalkerBase.apply_action(self, realaction)
+            if self.is_discrete:
+                realaction = self.action_list[action]
+            else:
+                realaction = action
+            WalkerBase.apply_action(self, realaction)
 
     def steering_cost(self, action):
         if not self.is_discrete:
@@ -676,10 +684,10 @@ class Turtlebot(WalkerBase):
     def setup_keys_to_action(self):
         self.keys_to_action = {
             (ord('w'),): 0,  ## forward
-            (ord('s'),): 1,  ## backward
-            (ord('d'),): 2,  ## turn right
-            (ord('a'),): 3,  ## turn left
-            (): 4
+            #(ord('s'),): 1,  ## backward
+            (ord('d'),): 1,  ## turn right
+            (ord('a'),): 2,  ## turn left
+            (): 3
         }
 
     def calc_state(self):
