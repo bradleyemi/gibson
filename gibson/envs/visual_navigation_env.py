@@ -180,13 +180,14 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
         self.start_location = self.select_agent_location()
         self.config["initial_pos"] = [self.start_location[0], self.start_location[1], self.default_z]
         self.target_location = self.select_target()
-        self.distance_to_target = np.linalg.norm(self.target_location - self.start_location)
         self.target_radius = 0.5
         self.render_map = render_map
         self.render_resolution = 256
         if render_map:
-            mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Beechwood/mesh_z_up.obj'
-            self.map_renderer = NavigationMapRenderer(-12, 3, -7.5, 7.5, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
+            mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Hanson/mesh_z_up.obj'
+            self.map_renderer = NavigationMapRenderer(-11.5, 5.5, -6, 11, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
+            #mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Beechwood/mesh_z_up.obj'
+            #self.map_renderer = NavigationMapRenderer(-12, 3, -7.5, 7.5, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
 
         
     def get_valid_locations(self, start_locations):
@@ -204,6 +205,7 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
         # make sure the target isn't the start location
         if distances[index] == 0:
             index = np.argsort(distance_errors)[1]
+        self.distance_to_target = distances[index]
         return self.locations[index,:]
 
     def _step(self, action):
@@ -214,6 +216,7 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
             obs["map"] = self.map_renderer.render()
         else:
             obs["map"] = np.zeros((self.resolution, self.resolution, 3))
+        info["distance"] = self.distance_to_target
         return obs, rew, done, info
 
     def calculate_target_observation(self):
