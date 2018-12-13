@@ -184,10 +184,10 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
         self.render_map = render_map
         self.render_resolution = 256
         if render_map:
-            mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Hanson/mesh_z_up.obj'
-            self.map_renderer = NavigationMapRenderer(-11.5, 5.5, -6, 11, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
-            #mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Beechwood/mesh_z_up.obj'
-            #self.map_renderer = NavigationMapRenderer(-12, 3, -7.5, 7.5, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
+            #mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Hanson/mesh_z_up.obj'
+            #self.map_renderer = NavigationMapRenderer(-11.5, 5.5, -6, 11, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
+            mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Beechwood/mesh_z_up.obj'
+            self.map_renderer = NavigationMapRenderer(-12, 3, -7.5, 7.5, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
 
         
     def get_valid_locations(self, start_locations):
