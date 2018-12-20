@@ -26,6 +26,7 @@ class View(Enum):
     SEMANTICS = 5
     PHYSICS = 6
     MAP = 7
+    RGB_MODIFIED = 8
 
 
 class SimpleUI():

@@ -8,170 +8,15 @@ import pickle
 import math
 from copy import copy
 import os
-import matplotlib.pyplot as plt
+from gibson.envs.map_renderer import NavigationMapRenderer
+
 from gibson import assets
-import meshcut
-
-class OccupancyMap(object):
-    
-    def __init__(self, xmin, xmax, ymin, ymax, voxel_length):
-        self.xmin, self.xmax = xmin, xmax
-        self.ymin, self.ymax = ymin, ymax
-        self.voxel_length = voxel_length      
-        self.size_x = math.ceil((xmax - xmin) / voxel_length)
-        self.size_y = math.ceil((ymax - ymin) / voxel_length)
-        self.bitmap = np.full((self.size_x, self.size_y), False, dtype=np.bool_)
-        
-    def update(self, x, y, val=True, thickness=0):
-        idx_x, idx_y = self._get_voxel_coords(x, y)
-        self.bitmap[idx_x, idx_y] = val
-        for t in range(thickness):
-            for xc in range(idx_x - t, idx_x + t):
-                for yc in range(idx_y - t, idx_y + t):
-                    self.bitmap[xc, yc] = val 
-        return self.bitmap
-    
-    def get(self, x, y):
-        idx_x, idx_y = self._get_voxel_coords(x, y)
-        return self.bitmap[idx_x, idx_y]
-
-    def clear(self):
-        self.bitmap = np.full((self.size_x, self.size_y), False, dtype=np.bool_)
-
-    def _get_voxel_coords(self, x, y):
-        idx_x = int((x - self.xmin) / self.voxel_length)
-        idx_y = int((y - self.ymin) / self.voxel_length)
-        idx_x = np.clip(idx_x, 0, self.size_x - 1)
-        idx_y = np.clip(idx_y, 0, self.size_y - 1)
-        if idx_y < 0 or idx_y < 0:
-            raise ValueError("Trying to set occupancy in grid cell ({}, {})".format(idx_x, idx_y))
-        return idx_x, idx_y
-
-def load_obj(fn):
-    verts = []
-    faces = []
-    with open(fn) as f:
-        for line in f:
-            if line[:2] == 'v ':
-                verts.append(list(map(float, line.strip().split()[1:4])))
-            if line[:2] == 'f ':
-                face = [int(item.split('/')[0]) for item in line.strip().split()[-3:]]
-                faces.append(face)
-    verts = np.array(verts)
-    faces = np.array(faces) - 1
-    return verts, faces
-
-class NavigationMapRenderer(object):
-    def __init__(self, x_min, x_max, y_min, y_max, mesh_file, mesh_z, voxel_size, line_resolution=50, render_resolution=128):
-        self.x_min = x_min
-        self.x_max = x_max
-        self.y_min = y_min
-        self.y_max = y_max
-        self.mesh_file = mesh_file
-        self.mesh_z = mesh_z
-        self.voxel_size = voxel_size
-        self.line_resolution = line_resolution
-        self.render_resolution = render_resolution
-        self.map_color = np.array([0,0,0])
-        self.agent_color = np.array([0,0,255])
-        self.target_color = np.array([0,255,0])
-        self.spawn_color = np.array([255,0,0])
-        self.last_pose = None
-        self.create_map_layer(self.mesh_file, self.mesh_z)
-        self.create_target_layer()
-        self.create_spawn_layer()
-        self.create_agent_layer()
-        self.render_image = np.ones((self.map_layer.bitmap.shape[0], self.map_layer.bitmap.shape[1], 3), dtype=np.uint8) * 255
-        self.draw_map()
-
-    def create_map_layer(self, mesh_file, mesh_z):
-        print("Creating map layer...")
-        self.map_layer = OccupancyMap(self.x_min, self.x_max, self.y_min, self.y_max, self.voxel_size)
-        verts, faces = load_obj(mesh_file)
-        cross_section = meshcut.cross_section(verts, faces, plane_orig=(0,0,mesh_z), plane_normal=(0,0,1))
-        for item in cross_section:
-            xy = item[:,0:2]
-            for i in range(xy.shape[0] - 1):
-                xl = xy[i,0]
-                xh = xy[i+1,0]
-                yl = xy[i,1]
-                yh = xy[i+1,1]
-                self.draw_line(self.map_layer, xl, yl, xh, yh, self.line_resolution)
-        print("Done.")
-        
-    def draw_map(self):
-        self.render_image[self.map_layer.bitmap] = self.map_color
-
-    def create_target_layer(self):
-        self.target_layer = OccupancyMap(self.x_min, self.x_max, self.y_min, self.y_max, self.voxel_size)
-
-    def create_spawn_layer(self):
-        self.spawn_layer = OccupancyMap(self.x_min, self.x_max, self.y_min, self.y_max, self.voxel_size)
-    
-    def create_agent_layer(self):
-        self.agent_layer = OccupancyMap(self.x_min, self.x_max, self.y_min, self.y_max, self.voxel_size)
-
-    def draw_box(self, layer, x_min, x_max, y_min, y_max):
-        x_idx_min, y_idx_min = layer._get_voxel_coords(x_min, y_min)
-        x_idx_max, y_idx_max = layer._get_voxel_coords(x_max, y_max)
-        for x in range(x_idx_min, x_idx_max + 1):
-            for y in range(y_idx_min, y_idx_max + 1):
-                layer.bitmap[x, y] = True
-
-    def draw_line(self, layer, x0, y0, x1, y1, resolution, thickness=0):
-        xs = np.linspace(x0, x1, num=resolution)
-        ys = np.linspace(y0, y1, num=resolution)
-        for x, y in zip(xs, ys):
-            layer.update(x, y, thickness=thickness)
-
-    def update_agent(self, agent_x, agent_y):
-        if self.last_pose is not None:
-            x_old, y_old = self.last_pose
-            self.draw_line(self.agent_layer, x_old, y_old, agent_x, agent_y)
-            self.last_pose = [agent_x, agent_y]
-        self.agent_layer.update(agent_x, agent_y, thickness=2)
-
-
-    def update_target(self, target_x, target_y, target_radius=0.25):
-        self.draw_box(self.target_layer,
-                      target_x - target_radius,
-                      target_x + target_radius,
-                      target_y - target_radius,
-                      target_y + target_radius)
-
-    def update_spawn(self, spawn_x, spawn_y, spawn_radius=0.25):
-        self.draw_box(self.spawn_layer,
-                      spawn_x - spawn_radius,
-                      spawn_x + spawn_radius,
-                      spawn_y - spawn_radius,
-                      spawn_y + spawn_radius)
-
-    def clear_nonstatic_layers(self):
-        self.last_pose = None
-        self.clear_agent_layer()
-        self.clear_target_layer()
-        self.clear_spawn_layer()
-        self.render_image = np.ones((self.map_layer.bitmap.shape[0], self.map_layer.bitmap.shape[1], 3), dtype=np.uint8) * 255
-        self.draw_map()
-
-    def clear_agent_layer(self):
-        self.agent_layer.clear()
-
-    def clear_target_layer(self):
-        self.target_layer.clear()
-
-    def clear_spawn_layer(self):
-        self.spawn_layer.clear()
-
-    def render(self):
-        self.render_image[self.agent_layer.bitmap] = self.agent_color
-        self.render_image[self.target_layer.bitmap] = self.target_color
-        self.render_image[self.spawn_layer.bitmap] = self.spawn_color
-        return imresize(self.render_image, (self.render_resolution, self.render_resolution, 3))
+from gibson.data.datasets import get_model_path
 
 class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, start_locations=None, render_map=True):
+    def __init__(self, config, gpu_count=0, start_locations=None, render_map=True, fixed_endpoints=True):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
+        self.fixed_endpoints = fixed_endpoints
         self.default_z = self.config["initial_pos"][2]
         self.target_mu = self.config["target_distance_mu"]
         self.target_sigma = self.config["target_distance_sigma"]
@@ -184,29 +29,34 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
         self.render_map = render_map
         self.render_resolution = 256
         if render_map:
-            mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Hanson/mesh_z_up.obj'
-            self.map_renderer = NavigationMapRenderer(-11.5, 5.5, -6, 11, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
-            #mesh_file = '/home/bradleyemi/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Beechwood/mesh_z_up.obj'
-            #self.map_renderer = NavigationMapRenderer(-12, 3, -7.5, 7.5, mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
+            mesh_file = os.path.join(get_model_path(self.config["model_id"]), "mesh_z_up.obj")
+            self.map_renderer = NavigationMapRenderer(mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
 
         
     def get_valid_locations(self, start_locations):
         return np.loadtxt(start_locations, delimiter=',')
     
     def select_agent_location(self):
-        index = np.random.choice(range(self.n_locations))
-        return self.locations[index,:]
+        if self.fixed_endpoints:
+            return self.config["initial_pos"][0:2]
+        else:
+            index = np.random.choice(range(self.n_locations))
+            return self.locations[index,:]
         
     def select_target(self):
-        distances = [np.linalg.norm(d - self.start_location) for d in self.locations]
-        desired_distance = np.random.normal(self.target_mu, self.target_sigma)
-        distance_errors = [abs(d - desired_distance) for d in distances]
-        index = np.argmin(distance_errors)
-        # make sure the target isn't the start location
-        if distances[index] == 0:
-            index = np.argsort(distance_errors)[1]
-        self.distance_to_target = distances[index]
-        return self.locations[index,:]
+        if self.fixed_endpoints:
+            self.distance_to_target = np.linalg.norm(np.array(self.config["initial_pos"][0:2]) - np.array(self.config["target_pos"][0:2]))
+            return self.config["target_pos"][0:2]
+        else:
+            distances = [np.linalg.norm(d - self.start_location) for d in self.locations]
+            desired_distance = np.random.normal(self.target_mu, self.target_sigma)
+            distance_errors = [abs(d - desired_distance) for d in distances]
+            index = np.argmin(distance_errors)
+            # make sure the target isn't the start location
+            if distances[index] == 0:
+                index = np.argsort(distance_errors)[1]
+            self.distance_to_target = distances[index]
+            return self.locations[index,:]
 
     def _step(self, action):
         obs, rew, done, info = HuskyNavigateEnv._step(self, action)
@@ -287,9 +137,10 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
 
 
 class HuskyVisualNavigateEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, texture=True, valid_locations=None):
+    def __init__(self, config, gpu_count=0, texture=True, valid_locations=None, render_map=True, fixed_endpoints=True):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
         self.use_valid_locations = valid_locations is not None
+        self.fixed_endpoints = fixed_endpoints
         if self.use_valid_locations:
             print("Using valid locations!")
             self.valid_locations = self.get_valid_locations(valid_locations)
@@ -303,6 +154,7 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.default_z = self.config["initial_pos"][2]
         self.cube_size = 0.2
         self.target_radius = 0.5
+        self.resolution = self.config["resolution"]
         self.cube_image = np.zeros((self.config["resolution"], self.config["resolution"], 3), np.uint32)
         self.target_x = np.random.uniform(self.min_target_x, self.max_target_x)
         self.target_y = np.random.uniform(self.min_target_y, self.max_target_y)
@@ -313,6 +165,10 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
             self.use_texture = True
             self.texture_path = os.path.join(os.path.dirname(os.path.abspath(assets.__file__)), "wood.jpg")
             self.load_texture(self.texture_path)
+        self.render_map = render_map
+        if render_map:
+            mesh_file = os.path.join(get_model_path(self.config["model_id"]), "mesh_z_up.obj")
+            self.map_renderer = NavigationMapRenderer(mesh_file, self.default_z, 0.1, render_resolution=self.resolution)
 
     def load_texture(self, texture_path):
         wood = imread(texture_path)
@@ -348,6 +204,11 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.depth = copy(obs["depth"]).squeeze()
         self.depth[self.depth == 0] = np.inf
         obs["rgb_filled"] = self._add_cube_into_image(obs, [self.target_x, self.target_y, self.default_z])
+        if self.render_map:
+            self.map_renderer.update_agent(*self.robot.get_position()[:2])
+            obs["map"] = self.map_renderer.render()
+        else:
+            obs["map"] = np.zeros((self.resolution, self.resolution, 3))
         return obs, rew, done, info
 
     def _add_cube_into_image(self, obs, location, color=[20,200,200]):
@@ -381,6 +242,8 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         return self.valid_locations[index,:]
 
     def select_new_target(self):
+        if self.fixed_endpoints:
+            return self.config["target_pos"][0], self.config["target_pos"][1]
         if self.use_valid_locations:
             location = self.sample_valid_location()
             print("New target is:", location)
@@ -389,6 +252,8 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
             return np.random.uniform(self.min_target_x, self.max_target_x), np.random.uniform(self.min_target_y, self.max_target_y)
 
     def select_new_agent_location(self):
+        if self.fixed_endpoints:
+            return self.config["initial_pos"]
         attempts = 0
         while attempts < 100:
             if self.use_valid_locations:
@@ -413,6 +278,14 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.cube_image = copy(obs["rgb_filled"])
         self.depth = copy(obs["depth"]).squeeze()
         obs["rgb_filled"] = self._add_cube_into_image(obs, [self.target_x, self.target_y, self.default_z])
+        if self.render_map:
+            self.map_renderer.clear_nonstatic_layers()
+            self.map_renderer.update_target(self.target_x, self.target_y, radius=0.125)
+            self.map_renderer.update_spawn(*self.config["initial_pos"][0:2], radius=0.125)
+            self.map_renderer.update_agent(*self.config["initial_pos"][0:2])
+            obs["map"] = self.map_renderer.render()
+        else:
+            obs["map"] = np.zeros((self.resolution, self.resolution, 3))
         return obs
 
     def _termination(self, debugmode=False):
@@ -431,13 +304,14 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         done = out_of_bounds or self.nframe >= self.config["episode_length"] or self._close_to_goal()
         return done
 
-
-    def render_map(self):
-        return self.cube_image
-
     def render_map_rgb(self):
-        x = self.render_map()
-        return x
+        if self.render_map:
+            return self.map_renderer.render()
+        else:
+            return np.zeros((self.resolution, self.resolution, 3))
+
+    def render_modified_rgb(self):
+        return self.cube_image
 
 class HuskyVisualObstacleAvoidanceEnv(HuskyVisualNavigateEnv):
     def __init__(self, config, gpu_count=0, start_locations_file=None):

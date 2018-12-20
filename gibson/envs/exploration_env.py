@@ -4,11 +4,14 @@ import scipy.ndimage
 from scipy.misc import imresize
 import pickle
 import math
-
+from gibson.envs.map_renderer import ExplorationMapRenderer
+import os
+from gibson.data.datasets import get_model_path
 
 class HuskyExplorationEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, start_locations_file=None):
+    def __init__(self, config, gpu_count=0, start_locations_file=None, fixed_endpoints=True):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
+        self.fixed_endpoints = fixed_endpoints
         self.cell_size = self.config["cell_size"]
         self.map_x_range = self.config["map_x_range"]
         self.map_y_range = self.config["map_y_range"]
@@ -59,7 +62,7 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
         return obs, rew, done, info
 
     def _reset(self):
-        if self.start_locations_file is not None:
+        if self.start_locations_file is not None and (not self.fixed_endpoints):
             new_start_location = self.valid_locations[np.random.randint(self.n_points), :]
             self.config["initial_pos"] = [new_start_location[0], new_start_location[1], self.default_z]
         obs = HuskyNavigateEnv._reset(self)
@@ -105,12 +108,16 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
 
 
 class HuskyVisualExplorationEnv(HuskyExplorationEnv):
-    def __init__(self, config, gpu_count=0, start_locations_file=None):
-        HuskyExplorationEnv.__init__(self, config, gpu_count, start_locations_file)
+    def __init__(self, config, gpu_count=0, start_locations_file=None, fixed_endpoints=True, render=True):
+        HuskyExplorationEnv.__init__(self, config, gpu_count, start_locations_file, fixed_endpoints)
         self.min_depth = 0.0
         self.max_depth = 1.5
         self.fov = self.config["fov"]
         self.screen_dim = self.config["resolution"]
+        self.render = render
+        if render:
+            mesh_file = os.path.join(get_model_path(self.config["model_id"]), "mesh_z_up.obj")
+            self.map_renderer = ExplorationMapRenderer(mesh_file, self.default_z, 0.1, self.cell_size, render_resolution = self.screen_dim)
 
     def _step(self, action):
         orig_found = np.sum(self.occupancy_map)
@@ -120,6 +127,9 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
         obs["map"] = self.render_map()
         self.reward += rew
         self.eps_reward += rew
+        if self.render:
+            self.map_renderer.update_agent(*self.robot.get_position()[:2])
+            obs["map_render"] = self.map_renderer.render()
         return obs, rew, done, info
 
     def _update_occupancy_map(self, depth_image):
@@ -130,6 +140,8 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
         yy += self.robot.get_position()[1]
         for x, y in zip(xx, yy):
             self.insert_occupancy_map(x, y)
+            if self.render:
+                self.map_renderer.update_grid(x, y)
 
     def insert_occupancy_map(self, x, y):
         idx_x = int((x - self.map_x_range[0]) / self.cell_size)
@@ -159,6 +171,21 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
         xx = x * math.cos(radians) + y * math.sin(radians)
         yy = -x * math.sin(radians) + y * math.cos(radians)
         return xx, yy
+
+    def _reset(self):
+        obs = HuskyExplorationEnv._reset(self)
+        if self.render:
+            self.map_renderer.clear_nonstatic_layers()
+            self.map_renderer.update_spawn(*self.config["initial_pos"][0:2], radius=0.125)
+            self.map_renderer.update_agent(*self.config["initial_pos"][0:2])
+            obs["map_render"] = self.map_renderer.render()
+        return obs
+
+    def render_map_rgb(self):
+        if self.render:
+            return self.map_renderer.render()
+        else:
+            return np.zeros((self.screen_dim, self.screen_dim, 3))
 
 
 

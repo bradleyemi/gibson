@@ -457,6 +457,8 @@ class CameraRobotEnv(BaseRobotEnv):
             return self.render_physics()
         if tag == View.MAP:
             return self.render_map_rgb()
+        if tag == View.RGB_MODIFIED:
+            return self.render_modified_rgb()
 
     def render_to_UI(self):
         '''Works for different UI: UI_SIX, UI_FOUR, UI_TWO
