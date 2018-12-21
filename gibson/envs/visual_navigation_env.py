@@ -14,7 +14,7 @@ from gibson import assets
 from gibson.data.datasets import get_model_path
 
 class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, start_locations=None, render_map=True, fixed_endpoints=True):
+    def __init__(self, config, gpu_count=0, start_locations=None, render_map=True, fixed_endpoints=False):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
         self.fixed_endpoints = fixed_endpoints
         self.default_z = self.config["initial_pos"][2]
