@@ -137,7 +137,7 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
 
 
 class HuskyVisualNavigateEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, texture=True, valid_locations=None, render_map=True, fixed_endpoints=True):
+    def __init__(self, config, gpu_count=0, texture=True, valid_locations=None, render_map=True, fixed_endpoints=False):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
         self.use_valid_locations = valid_locations is not None
         self.fixed_endpoints = fixed_endpoints

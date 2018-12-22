@@ -9,7 +9,7 @@ import os
 from gibson.data.datasets import get_model_path
 
 class HuskyExplorationEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, start_locations_file=None, fixed_endpoints=True):
+    def __init__(self, config, gpu_count=0, start_locations_file=None, fixed_endpoints=False):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
         self.fixed_endpoints = fixed_endpoints
         self.cell_size = self.config["cell_size"]
