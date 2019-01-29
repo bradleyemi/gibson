@@ -43,17 +43,35 @@ For docker installation:
 
 Run `docker run --runtime=nvidia --rm nvidia/cuda nvidia-smi` to verify your installation.
 
-To build your own docker image:
+To build your own docker image (recommended):
 
 ```bash
 git clone https://github.com/bradleyemi/gibson.git
 cd gibson
-docker build . -t gibson
+docker build . -t midlevel-vision-envs
+```
+
+Or download our docker image:
+
+```bash
+docker pull bradleyemi/midlevel-vision-envs:0.1
+```
+
+Then:
+```bash
+export DISPLAY=:0.0
+xhost +local:root
+docker run --runtime=nvidia -ti --rm -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix midlevel-vision-envs
 ```
 
 ### Quick Start
 
 See `gibson/examples/demo/play_husky_camera.py` for an example of how to interface with our OpenAI gym-like environment, and `gibson/examples/demo/train_husky_navigate_ppo2` for a training example.
+
+For the simplest example:
+```
+python gibson/examples/demo/play_husky_camera.py --downstream_task='navigation' # select 'navigation', 'exploration', 'local_planning'
+```
 
 ### Further Customization
 
