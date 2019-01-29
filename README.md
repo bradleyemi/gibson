@@ -6,7 +6,7 @@ In this repository we provide the custom environments we used to train models in
 
 ### Visual Navigation
 
-<img src=misc/visual_exploration.gif width=512>
+<img src=misc/visual_navigation.gif width=512>
 
 The agent must navigate to a wooden cube. It receives only RGB frames as input.
 
