@@ -114,9 +114,6 @@ def play(env, transpose=True, zoom=None, callback=None, keys_to_action=None):
         if len(pressed_keys) == 0:
             action = keys_to_action[()]
             obs, rew, env_done, info = env._step(action)
-            if steps % 50 == 0:
-                #print(obs["rgb_filled"].shape, obs["rgb_filled"].dtype)
-                imsave("/home/bradleyemi/svl/images/martinville-{}.png".format(steps), obs["rgb_filled"])
             steps += 1
              
             if env_done:

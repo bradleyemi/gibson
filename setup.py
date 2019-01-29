@@ -17,10 +17,11 @@ class PostInstallCommand(install):
 setup(name='gibson',
     version='0.3.1',
     description='Real Environment Developed by Stanford University',
-    url='https://github.com/fxia22/realenv',
+    url='https://github.com/bradleyemi/gibson',
     author='Stanford University',
     zip_safe=False,
     install_requires=[
+            'scikit-image>=0.14.2',
             'numpy>=1.10.4',
             'pyglet>=1.2.0',
             'gym>=0.9.4',
