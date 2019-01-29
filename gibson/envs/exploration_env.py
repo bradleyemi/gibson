@@ -56,10 +56,10 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
         return [new_block]
     
     def _step(self, action):
-        obs, rew, done, info = HuskyNavigateEnv._step(self, action)
+        self.obs, rew, done, info = HuskyNavigateEnv._step(self, action)
         yaw = self.robot.get_rpy()[2]
-        obs["map"] = self.render_map(rotate=True, rotate_angle=yaw, translate=True)
-        return obs, rew, done, info
+        self.obs["map"] = self.render_map(rotate=True, rotate_angle=yaw, translate=True)
+        return self.obs, rew, done, info
 
     def _reset(self):
         if self.start_locations_file is not None and (not self.fixed_endpoints):
@@ -108,7 +108,7 @@ class HuskyExplorationEnv(HuskyNavigateEnv):
 
 
 class HuskyVisualExplorationEnv(HuskyExplorationEnv):
-    def __init__(self, config, gpu_count=0, start_locations_file=None, fixed_endpoints=True, render=True):
+    def __init__(self, config, gpu_count=0, start_locations_file=None, fixed_endpoints=False, render=True):
         HuskyExplorationEnv.__init__(self, config, gpu_count, start_locations_file, fixed_endpoints)
         self.min_depth = 0.0
         self.max_depth = 1.5
@@ -121,16 +121,14 @@ class HuskyVisualExplorationEnv(HuskyExplorationEnv):
 
     def _step(self, action):
         orig_found = np.sum(self.occupancy_map)
-        obs, _, done, info = HuskyExplorationEnv._step(self, action)
-        self._update_occupancy_map(obs['depth'])
+        self.obs, _, done, info = HuskyExplorationEnv._step(self, action)
+        self._update_occupancy_map(self.obs['depth'])
         rew = (np.sum(self.occupancy_map) - orig_found) * 0.1
-        obs["map"] = self.render_map()
-        self.reward += rew
-        self.eps_reward += rew
+        self.obs["map"] = self.render_map()
         if self.render:
             self.map_renderer.update_agent(*self.robot.get_position()[:2])
-            obs["map_render"] = self.map_renderer.render()
-        return obs, rew, done, info
+            self.obs["map_render"] = self.map_renderer.render()
+        return self.obs, rew, done, info
 
     def _update_occupancy_map(self, depth_image):
         clipped_depth_image = np.clip(depth_image, self.min_depth, self.max_depth)

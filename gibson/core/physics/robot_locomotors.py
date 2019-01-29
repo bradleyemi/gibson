@@ -463,7 +463,7 @@ class Husky(WalkerBase):
             self.action_space = gym.spaces.Discrete(3)        
             self.torque = 0.03
             if self.ideal_position_control:
-                self.action_list = [self.move_forward, self.turn_right, self.turn_left]
+                self.action_list = [self.move_forward, self.turn_right, self.turn_left, lambda: None]
             else:
                 self.action_list = [[self.torque, self.torque, self.torque, self.torque],
                                     [-self.torque, -self.torque, -self.torque, -self.torque],

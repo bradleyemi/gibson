@@ -1,16 +1,33 @@
-from gibson.envs.visual_navigation_env import HuskyVisualNavigateEnv, HuskyVisualObstacleAvoidanceEnv, HuskyCoordinateNavigateEnv
-from gibson.envs.exploration_env import HuskyExplorationEnv, HuskyVisualExplorationEnv
+from gibson.envs.visual_navigation_env import HuskyVisualNavigateEnv, HuskyCoordinateNavigateEnv
+from gibson.envs.exploration_env import HuskyVisualExplorationEnv
 from gibson.utils.play import play
 import os
+import yaml
+from gibson.data.datasets import get_model_path
 
-config_file = "/home/bradleyemi/svl/visual-cortex-parent/teas/teas/env/gibson/husky_visual_navigate_test.yaml"
-start_locations_file = "/home/bradleyemi/svl/visual-cortex-parent/GibsonEnv/gibson/assets/dataset/Beechwood/first_floor_poses.csv"
+DEFAULT_CONFIGS = {
+    'navigation': '../configs/husky_visual_navigate.yaml',
+    'exploration': '../configs/husky_visual_explore.yaml',
+    'local_planning': '../configs/husky_coordinate_navigate.yaml'
+}
 
+def make_env(downstream_task, config=None):
+    assert (downstream_task in ['navigation', 'exploration', 'local_planning'])
+    if config is None:
+        config = DEFAULT_CONFIGS[downstream_task]
+    start_locations_file = os.path.join(get_model_path('Beechwood'), "first_floor_poses.csv")
+    if downstream_task == 'navigation':
+        return HuskyVisualNavigateEnv(config=config, gpu_count=0)
+    elif downstream_task == 'exploration':
+        return HuskyVisualExplorationEnv(config=config, gpu_count=0, start_locations_file=start_locations_file)
+    elif downstream_task == 'local_planning':
+        return HuskyCoordinateNavigateEnv(config=config, gpu_count=0, start_locations_file=start_locations_file)
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('--config', type=str, default=config_file)
+    parser.add_argument('--config', type=str, default=None)
+    parser.add_argument('--downstream_task', type=str) # choose "navigation", "exploration", "local_planning"
     args = parser.parse_args()
-    env = HuskyVisualNavigateEnv(config=args.config, gpu_count = 0)
-    play(env, zoom=4)
+    env = make_env(args.downstream_task, config=args.config)
+    play(env)

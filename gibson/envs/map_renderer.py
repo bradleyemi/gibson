@@ -1,7 +1,7 @@
 import numpy as np
 import meshcut
 from gibson import assets
-import meshcut
+from gibson.utils import meshcut
 import matplotlib.pyplot as plt
 from scipy.misc import imresize
 import math

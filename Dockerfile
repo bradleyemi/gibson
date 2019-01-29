@@ -69,7 +69,12 @@ ADD  . /root/mount/gibson
 WORKDIR /root/mount/gibson
 
 RUN bash build.sh build_local
-RUN  pip install -e .
+
+WORKDIR /root/mount/gibson/gibson
+RUN wget https://storage.googleapis.com/midlevel-assets/midlevel-vision-assets.tar.gz
+RUN tar -zxf midlevel-vision-assets.tar.gz && rm midlevel-vision-assets.tar.gz
+
+RUN pip install -e .
 
 ENV QT_X11_NO_MITSHM 1
 

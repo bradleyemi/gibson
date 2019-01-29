@@ -7,6 +7,7 @@ import time
 import pygame
 import pybullet as p
 from gibson.core.render.profiler import Profiler
+from scipy.misc import imsave
 '''
 try:
     matplotlib.use('GTK3Agg')
@@ -103,6 +104,7 @@ def play(env, transpose=True, zoom=None, callback=None, keys_to_action=None):
     obs = env.reset()
     do_restart = False
     last_keys = []              ## Prevent overacting
+    steps = 0
     while running:
         if do_restart:
             do_restart = False
@@ -112,6 +114,11 @@ def play(env, transpose=True, zoom=None, callback=None, keys_to_action=None):
         if len(pressed_keys) == 0:
             action = keys_to_action[()]
             obs, rew, env_done, info = env._step(action)
+            if steps % 50 == 0:
+                #print(obs["rgb_filled"].shape, obs["rgb_filled"].dtype)
+                imsave("/home/bradleyemi/svl/images/martinville-{}.png".format(steps), obs["rgb_filled"])
+            steps += 1
+             
             if env_done:
                 obs = env._reset()
             '''
