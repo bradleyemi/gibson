@@ -61,7 +61,7 @@ Then:
 ```bash
 export DISPLAY=:0.0
 xhost +local:root
-docker run --runtime=nvidia -ti --rm -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix midlevel-vision-envs
+docker run --runtime=nvidia -ti --rm -e DISPLAY -v /tmp/.X11-unix:/tmp/.X11-unix bradleyemi/midlevel-vision-envs:0.1
 ```
 
 ### Quick Start
