@@ -34,7 +34,7 @@ RUN pip install tensorflow==1.3
 
 WORKDIR /root
 
-RUN apt-get install -y git build-essential cmake libopenmpi-dev 
+RUN apt-get update && apt-get install -y git build-essential cmake libopenmpi-dev 
 		
 RUN apt-get install -y zlib1g-dev
 
@@ -74,6 +74,7 @@ WORKDIR /root/mount/gibson/gibson
 RUN wget https://storage.googleapis.com/midlevel-assets/midlevel-vision-assets.tar.gz
 RUN tar -zxf midlevel-vision-assets.tar.gz && rm midlevel-vision-assets.tar.gz
 
+WORKDIR /root/mount/gibson
 RUN pip install -e .
 
 ENV QT_X11_NO_MITSHM 1

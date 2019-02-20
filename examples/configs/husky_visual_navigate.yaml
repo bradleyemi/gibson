@@ -7,7 +7,7 @@ initial_pos: [-7.50, 3.48, 0.15]
 fov: 1.57
 is_discrete: true
 ideal_position_control: true
-episode_length: 200
+episode_length: 400
 use_filler: true
 display_ui: true
 show_diagnostics: false
