@@ -68,6 +68,7 @@ class BaseEnv(gym.Env):
         return config_data
         
     def create_scene(self):
+        print("Creating scene")
         if self.scene is not None:
             return
         if self.scene_type == "stadium":

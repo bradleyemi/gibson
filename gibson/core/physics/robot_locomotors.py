@@ -463,7 +463,7 @@ class Husky(WalkerBase):
             self.action_space = gym.spaces.Discrete(3)        
             self.torque = 0.03
             if self.ideal_position_control:
-                self.action_list = [self.move_forward, self.turn_right, self.turn_left, lambda: None]
+                self.action_list = [self.move_forward, self.turn_right, self.turn_left]
             else:
                 self.action_list = [[self.torque, self.torque, self.torque, self.torque],
                                     [-self.torque, -self.torque, -self.torque, -self.torque],
@@ -628,7 +628,7 @@ class Turtlebot(WalkerBase):
         if self.is_discrete:
             if self.ideal_position_control:
                 self.action_space = gym.spaces.Discrete(3)
-                self.action_list = [self.move_forward, self.turn_right, self.turn_left]
+                self.action_list = [self.move_forward, self.turn_right, self.turn_left, lambda:None]
             else:
                 self.action_space = gym.spaces.Discrete(5)
                 self.vel = 0.1

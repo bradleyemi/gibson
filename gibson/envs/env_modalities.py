@@ -128,6 +128,7 @@ class BaseRobotEnv(BaseEnv):
 
     def scene_introduce(self):
         assert(self._robot_introduced)
+        print("introducing scene")
         self.create_scene()
         self._scene_introduced = True
 
@@ -355,6 +356,8 @@ class CameraRobotEnv(BaseRobotEnv):
         self.save_frame  = 0
         self.fps = 0
 
+        self.ui_initialized = False
+
 
     def robot_introduce(self, robot):
         BaseRobotEnv.robot_introduce(self, robot)
@@ -382,8 +385,9 @@ class CameraRobotEnv(BaseRobotEnv):
         }
 
         assert self.config["ui_num"] == len(self.config['ui_components']), "In configuration, ui_num is not equal to the number of ui components"
-        if self.config["display_ui"]:
+        if self.config["display_ui"] and not self.ui_initialized:
             self.UI = ui_map[self.config["ui_num"]](self.windowsz, self, self.port_ui)
+            self.ui_initialized = True
 
 
     def _reset(self):
@@ -552,10 +556,11 @@ class CameraRobotEnv(BaseRobotEnv):
                 seqlen = 2,
                 off_3d = False,
                 train = False,
-                overwrite_fofn=True, env = self, only_load = self.config["model_id"])
+                overwrite_fofn=True, env = self, only_load = self.model_id)
 
         scene_dict = dict(zip(self.dataset.scenes, range(len(self.dataset.scenes))))
         ## Todo: (hzyjerry) more error handling
+        print(self.model_id, scene_dict)
         if not self.model_id in scene_dict.keys():
              raise error.Error("Dataset not found: model {} cannot be loaded".format(self.model_id))
         else:

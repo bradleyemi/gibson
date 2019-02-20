@@ -48,6 +48,7 @@ class BaseRobot:
         self.scale = scale
         self._load_model()
         self.eyes = self.parts["eyes"]
+        print(self.eyes)
         
         self.env = env
 

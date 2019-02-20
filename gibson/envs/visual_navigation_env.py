@@ -1,13 +1,17 @@
-from gibson.envs.husky_env import HuskyNavigateEnv
+from gibson.envs.husky_env import HuskyNavigateEnv, tracking_camera
+from gibson.envs.env_modalities import CameraRobotEnv
 from gibson.envs.cube_projection import Cube, generate_projection_matrix, draw_cube, get_cube_depth_and_faces
+from gibson.core.physics.robot_locomotors import Husky, Turtlebot
 import numpy as np
 from scipy.misc import imresize
 from skimage.io import imread
 import skimage
+import subprocess
 import pickle
 import math
 from copy import copy
 import os
+import pybullet as p
 from gibson.envs.map_renderer import NavigationMapRenderer
 
 from gibson import assets
@@ -135,6 +139,89 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
         else:
             return np.zeros((self.resolution, self.resolution, 3))
 
+class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
+    def __init__(self, config, gpu_count=0, render_map=False, fixed_endpoints=False):
+        self.config = self.parse_config(config)
+        CameraRobotEnv.__init__(self, self.config, gpu_count, scene_type='building', tracking_camera=tracking_camera)
+
+        self.fixed_endpoints = fixed_endpoints
+        
+        # configure environment
+        self.model_selection = self.config["model_selection"]
+        assert self.model_selection in ['in_order', 'random']
+
+        self.target_mu = self.config["target_distance_mu"]
+        self.target_sigma = self.config["target_distance_sigma"]
+
+        self.model_ids = self.config["model_ids"]
+        self.z_coordinates = {}
+        for model_id, z in zip(self.model_ids, self.config["z_coordinates"]):
+            self.z_coordinates[model_id] = z
+
+        self.all_locations = self.get_valid_locations()
+        
+        self.model_index = -1
+        if not self.fixed_endpoints:
+            self.kill_depth_render()
+            self.switch_model(self.model_selection)
+        else:
+            self.model_id = self.config["model_id"]
+            self.default_z = self.config["initial_pos"][2]
+
+        self.start_location = self.select_agent_location()
+        self.config["initial_pos"] = [self.start_location[0], self.start_location[1], self.default_z]
+        self.target_location = self.select_target()
+
+        # introduce robot and scene
+        self.robot_introduce(Husky(self.config, env=self))
+        self.scene_introduce()
+
+        self.eps_count = 1
+
+        self.target_radius = 0.5
+        self.render_map = render_map
+        self.render_resolution = 256
+        if render_map:
+            mesh_file = os.path.join(get_model_path(self.model_id), "mesh_z_up.obj")
+            self.map_renderer = NavigationMapRenderer(mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
+
+    def switch_model(self, model_selection):
+        if model_selection == 'in_order':
+            self.model_index = (self.model_index + 1) % len(self.model_ids)
+            self.model_id = self.model_ids[self.model_index]
+            self.model_path = get_model_path(self.model_id)
+        elif model_selection == 'random':
+            self.model_id = np.random.choice(self.model_ids)
+            self.model_path = get_model_path(self.model_id)
+        self.locations = self.all_locations[self.model_id]
+        self.n_locations = self.locations.shape[0]
+        self.default_z = self.z_coordinates[self.model_id]
+        if self.render_map:
+            mesh_file = os.path.join(get_model_path(self.model_id), "mesh_z_up.obj")
+            self.map_renderer = NavigationMapRenderer(mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
+
+
+    def get_valid_locations(self):
+        floor_poses_files = [os.path.join(get_model_path(model_id), "first_floor_poses.csv") for model_id in self.model_ids]
+        result = {}
+        for model_id, floor_poses_file in zip(self.model_ids, floor_poses_files):
+            result[model_id] = np.loadtxt(floor_poses_file, delimiter=',')
+        return result
+
+    def _reset(self):
+        if self.eps_count % self.config["switch_frequency"] == 0:
+            # kill the scene
+            p.resetSimulation()
+            self.r_camera_mul.terminate()
+            # select new scene
+            self.switch_model(self.model_selection)
+            self.scene = None
+            self._robot_introduced = False
+            self._scene_introduced = False
+            self.robot_introduce(Husky(self.config, env=self))
+            self.scene_introduce()
+        return HuskyCoordinateNavigateEnv._reset(self)
+
 
 class HuskyVisualNavigateEnv(HuskyNavigateEnv):
     def __init__(self, config, gpu_count=0, texture=True, valid_locations=None, render_map=True, fixed_endpoints=False):
@@ -145,6 +232,8 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
             print("Using valid locations!")
             self.valid_locations = self.get_valid_locations(valid_locations)
             self.n_locations = self.valid_locations.shape[0]
+            self.target_distance_mu = self.config["target_distance_mu"]
+            self.target_distance_sigma = self.config["target_distance_sigma"]
         self.min_target_x, self.max_target_x = self.config["x_target_range"]
         self.min_target_y, self.max_target_y = self.config["y_target_range"]
         self.min_agent_x, self.max_agent_x = self.config["x_boundary"]
@@ -163,7 +252,7 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.use_texture = False
         if texture:
             self.use_texture = True
-            self.texture_path = os.path.join(os.path.dirname(os.path.abspath(assets.__file__)), "wood.jpg")
+            self.texture_path = os.path.join(os.path.dirname(os.path.abspath(assets.__file__)), "orange_wrap.jpg")
             self.load_texture(self.texture_path)
         self.render_map = render_map
         if render_map:
@@ -173,7 +262,8 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
     def load_texture(self, texture_path):
         wood = imread(texture_path)
         size = self.config["resolution"]
-        self.texture_image = skimage.transform.resize(wood[:, 42:208], (size,size))
+        #self.texture_image = skimage.transform.resize(wood[:, 42:208], (size,size))
+        self.texture_image = skimage.transform.resize(wood, (size,size))
         self.texture_points = np.array([[0.,0.,size,size],[size,0.,0.,size]]).T
 
     def get_valid_locations(self, valid_locations):
@@ -245,35 +335,45 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         if self.fixed_endpoints:
             return self.config["target_pos"][0], self.config["target_pos"][1]
         if self.use_valid_locations:
-            location = self.sample_valid_location()
-            print("New target is:", location)
-            return location
+            #location = self.sample_valid_location()
+            #print("New target is:", location)
+            distances = [np.linalg.norm(d - self.config["initial_pos"][0:2]) for d in self.valid_locations]
+            desired_distance = np.random.normal(self.target_distance_mu, self.target_distance_sigma)
+            distance_errors = [abs(d - desired_distance) for d in distances]
+            index = np.argmin(distance_errors)
+            # make sure the target isn't the start location
+            if distances[index] == 0:
+                index = np.argsort(distance_errors)[1]
+            self.distance_to_target = distances[index]
+            return self.valid_locations[index,:]
         else:
-            return np.random.uniform(self.min_target_x, self.max_target_x), np.random.uniform(self.min_target_y, self.max_target_y)
+            attempts = 0
+            while attempts < 100:
+                spawn_x = np.random.uniform(self.min_spawn_x, self.max_spawn_x)
+                spawn_y = np.random.uniform(self.min_spawn_y, self.max_spawn_y)
+                distance = np.linalg.norm(np.array([spawn_x, spawn_y]) - np.array([self.config["initial_pos"][0], self.config["initial_pos"][1]]))
+                if distance < self.max_target_distance and distance > self.min_target_distance:
+                    break
+                attempts += 1
+            if attempts == 100:
+                raise Exception("Could not find a valid spawn location. Try expanding the target distance range.")
+            return [spawn_x, spawn_y]
 
     def select_new_agent_location(self):
         if self.fixed_endpoints:
             return self.config["initial_pos"]
-        attempts = 0
-        while attempts < 100:
-            if self.use_valid_locations:
-                spawn_x, spawn_y = self.sample_valid_location()
-            else:
-                spawn_x = np.random.uniform(self.min_spawn_x, self.max_spawn_x)
-                spawn_y = np.random.uniform(self.min_spawn_y, self.max_spawn_y)
-            distance = np.linalg.norm(np.array([spawn_x, spawn_y]) - np.array([self.target_x, self.target_y]))
-            if distance < self.max_target_distance and distance > self.min_target_distance:
-                break
-            attempts += 1
-        if attempts == 100:
-            raise Exception("Could not find a valid spawn location. Try expanding the target distance range.")
-        print("New agent location is:", spawn_x, spawn_y)
-        print("Distance to target:", distance)
+        if self.use_valid_locations:
+            spawn_x, spawn_y = self.valid_locations[np.random.choice(range(self.n_locations)),:]
+        else:
+            spawn_x = np.random.uniform(self.min_spawn_x, self.max_spawn_x)
+            spawn_y = np.random.uniform(self.min_spawn_y, self.max_spawn_y)
         return [spawn_x, spawn_y, self.default_z]
 
     def _reset(self):
-        self.target_x, self.target_y = self.select_new_target()
         self.config["initial_pos"] = self.select_new_agent_location()
+        self.target_x, self.target_y = self.select_new_target()
+        print("new agent pos", self.config["initial_pos"])
+        print("new target", self.target_x, self.target_y)
         obs = HuskyNavigateEnv._reset(self)
         self.cube_image = copy(obs["rgb_filled"])
         self.depth = copy(obs["depth"]).squeeze()
@@ -301,7 +401,7 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
             print("Agent fell off")
         out_of_bounds = x < self.min_agent_x or x > self.max_agent_x or y < self.min_agent_y or y > self.max_agent_y
         #dead = abs(roll) > 1.22 or abs(pitch) > 1.22 or abs(z - z_initial) > 0.5
-        done = out_of_bounds or self.nframe >= self.config["episode_length"] or self._close_to_goal()
+        done = out_of_bounds or (abs(z - z_initial) > 0.5) or self.nframe >= self.config["episode_length"] or self._close_to_goal()
         return done
 
     def render_map_rgb(self):

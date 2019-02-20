@@ -1,5 +1,4 @@
 import numpy as np
-import meshcut
 from gibson import assets
 from gibson.utils import meshcut
 import matplotlib.pyplot as plt
