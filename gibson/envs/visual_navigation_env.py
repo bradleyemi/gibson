@@ -3,6 +3,7 @@ from gibson.envs.env_modalities import CameraRobotEnv
 from gibson.envs.cube_projection import Cube, generate_projection_matrix, draw_cube, get_cube_depth_and_faces
 from gibson.core.physics.robot_locomotors import Husky, Turtlebot
 import numpy as np
+import gc
 from scipy.misc import imresize
 from skimage.io import imread
 import skimage
@@ -16,6 +17,8 @@ from gibson.envs.map_renderer import NavigationMapRenderer
 
 from gibson import assets
 from gibson.data.datasets import get_model_path
+
+import tracemalloc
 
 class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
     def __init__(self, config, gpu_count=0, start_locations=None, render_map=True, fixed_endpoints=False):
@@ -141,10 +144,15 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
 
 class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
     def __init__(self, config, gpu_count=0, render_map=False, fixed_endpoints=False):
+        tracemalloc.start()
+        self.old_snapshot = None
         self.config = self.parse_config(config)
         CameraRobotEnv.__init__(self, self.config, gpu_count, scene_type='building', tracking_camera=tracking_camera)
 
         self.fixed_endpoints = fixed_endpoints
+        self.target_radius = 0.5
+        self.render_map = render_map
+        self.render_resolution = 256
         
         # configure environment
         self.model_selection = self.config["model_selection"]
@@ -162,7 +170,6 @@ class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
         
         self.model_index = -1
         if not self.fixed_endpoints:
-            self.kill_depth_render()
             self.switch_model(self.model_selection)
         else:
             self.model_id = self.config["model_id"]
@@ -178,9 +185,7 @@ class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
 
         self.eps_count = 1
 
-        self.target_radius = 0.5
-        self.render_map = render_map
-        self.render_resolution = 256
+        
         if render_map:
             mesh_file = os.path.join(get_model_path(self.model_id), "mesh_z_up.obj")
             self.map_renderer = NavigationMapRenderer(mesh_file, self.default_z, 0.1, render_resolution=self.render_resolution)
@@ -213,6 +218,19 @@ class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
             # kill the scene
             p.resetSimulation()
             self.r_camera_mul.terminate()
+            self.r_camera_rgb._close()
+            print("Garbage collection", gc.collect())
+            
+            snapshot = tracemalloc.take_snapshot()
+            if self.old_snapshot is not None:
+                top_stats = snapshot.compare_to(self.old_snapshot, 'lineno')
+                print("[ Top 20 ]")
+                for stat in top_stats[:20]:
+                    print(stat)
+            self.old_snapshot = snapshot
+
+
+            
             # select new scene
             self.switch_model(self.model_selection)
             self.scene = None
