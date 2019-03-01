@@ -143,7 +143,7 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
             return np.zeros((self.resolution, self.resolution, 3))
 
 class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
-    def __init__(self, config, gpu_count=0, render_map=False, fixed_endpoints=False):
+    def __init__(self, config, gpu_count=0, render_map=True, fixed_endpoints=False):
         tracemalloc.start()
         self.old_snapshot = None
         self.config = self.parse_config(config)
