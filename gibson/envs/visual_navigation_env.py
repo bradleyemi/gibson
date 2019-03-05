@@ -270,7 +270,7 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.use_texture = False
         if texture:
             self.use_texture = True
-            self.texture_path = os.path.join(os.path.dirname(os.path.abspath(assets.__file__)), "orange_wrap.jpg")
+            self.texture_path = os.path.join(os.path.dirname(os.path.abspath(assets.__file__)), "wood.jpg")
             self.load_texture(self.texture_path)
         self.render_map = render_map
         if render_map:
