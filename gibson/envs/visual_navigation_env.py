@@ -21,7 +21,7 @@ from gibson.data.datasets import get_model_path
 import tracemalloc
 
 class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
-    def __init__(self, config, gpu_count=0, start_locations=None, render_map=True, fixed_endpoints=False):
+    def __init__(self, config, gpu_count=0, start_locations=None, render_map=False, fixed_endpoints=False):
         HuskyNavigateEnv.__init__(self, config, gpu_count)
         self.fixed_endpoints = fixed_endpoints
         self.default_z = self.config["initial_pos"][2]
@@ -143,7 +143,7 @@ class HuskyCoordinateNavigateEnv(HuskyNavigateEnv):
             return np.zeros((self.resolution, self.resolution, 3))
 
 class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
-    def __init__(self, config, gpu_count=0, render_map=True, fixed_endpoints=False):
+    def __init__(self, config, gpu_count=0, render_map=False, fixed_endpoints=False, switch_frequency=None):
         tracemalloc.start()
         self.old_snapshot = None
         self.config = self.parse_config(config)
@@ -153,6 +153,11 @@ class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
         self.target_radius = 0.5
         self.render_map = render_map
         self.render_resolution = 256
+        if switch_frequency is not None:
+            self.switch_frequency = switch_frequency
+        else:
+            self.switch_frequency = self.config["switch_frequency"]
+
         
         # configure environment
         self.model_selection = self.config["model_selection"]
@@ -214,7 +219,7 @@ class HuskyCoordinateNavigateMultiEnv(HuskyCoordinateNavigateEnv):
         return result
 
     def _reset(self):
-        if self.eps_count % self.config["switch_frequency"] == 0:
+        if self.eps_count % self.switch_frequency == 0:
             # kill the scene
             p.resetSimulation()
             self.r_camera_mul.terminate()
@@ -260,7 +265,7 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.min_spawn_y, self.max_spawn_y = self.config["y_spawn_range"]
         self.default_z = self.config["initial_pos"][2]
         self.cube_size = 0.2
-        self.target_radius = 0.5
+        self.target_radius = 0.25
         self.resolution = self.config["resolution"]
         self.cube_image = np.zeros((self.config["resolution"], self.config["resolution"], 3), np.uint32)
         self.target_x = np.random.uniform(self.min_target_x, self.max_target_x)
