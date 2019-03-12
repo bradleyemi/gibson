@@ -265,7 +265,7 @@ class HuskyVisualNavigateEnv(HuskyNavigateEnv):
         self.min_spawn_y, self.max_spawn_y = self.config["y_spawn_range"]
         self.default_z = self.config["initial_pos"][2]
         self.cube_size = 0.2
-        self.target_radius = 0.25
+        self.target_radius = 0.5
         self.resolution = self.config["resolution"]
         self.cube_image = np.zeros((self.config["resolution"], self.config["resolution"], 3), np.uint32)
         self.target_x = np.random.uniform(self.min_target_x, self.max_target_x)
